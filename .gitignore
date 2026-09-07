@@ -1,0 +1,83 @@
+# ---------------------------------------------------------------------------
+# Données bancaires réelles — NE JAMAIS COMMITTER
+# (IBAN, titulaire, n° de carte : cf. CLAUDE.md § Publication)
+# ---------------------------------------------------------------------------
+data_entree/
+data_sortie/
+
+# Filet de sécurité : tout classeur / PDF / CSV déposé ailleurs dans le projet
+*.pdf
+*.xlsx
+*.xls
+*.xlsm
+*.csv
+
+# ---------------------------------------------------------------------------
+# Environnement Python
+# ---------------------------------------------------------------------------
+venv/
+.venv/
+env/
+ENV/
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.eggs/
+build/
+dist/
+.Python
+pip-log.txt
+
+# Outils de dev éventuels
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.ipynb_checkpoints/
+
+# ---------------------------------------------------------------------------
+# Streamlit
+# ---------------------------------------------------------------------------
+.streamlit/secrets.toml
+
+# ---------------------------------------------------------------------------
+# Secrets & configuration locale
+# ---------------------------------------------------------------------------
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+credentials.json
+secrets.toml
+
+# ---------------------------------------------------------------------------
+# Éditeurs / IDE
+# ---------------------------------------------------------------------------
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# ---------------------------------------------------------------------------
+# Système
+# ---------------------------------------------------------------------------
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ---------------------------------------------------------------------------
+# Fichiers temporaires / bureautique
+# ---------------------------------------------------------------------------
+~$*
+*.tmp
+*.bak
+*.log
+
+# ---------------------------------------------------------------------------
+# Publication restreinte : seuls app.py et requirements.txt sont poussés
+# sur GitHub. Le CLI de test et la doc interne restent locaux.
+# ---------------------------------------------------------------------------
+script_rapprochement.py
+CLAUDE.md
