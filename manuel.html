@@ -1,0 +1,482 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Manuel du rapprochement bancaire</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+
+<style>
+  :root {
+    /* Palette « grand livre » — clair */
+    --ground: #F4F6F3;
+    --surface: #FFFFFF;
+    --surface-sunk: #EEF1ED;
+    --ink: #19211D;
+    --muted: #58635C;
+    --faint: #7C877F;
+    --hair: #DDE2DC;
+    --hair-strong: #C9D0C8;
+    --accent: #0E7A63;
+    --accent-ink: #0A5A49;
+    --accent-wash: #E4F0EB;
+    --ok: #1E7A4C;
+    --ok-wash: #E4F1E7;
+    --warn: #9A6714;
+    --warn-wash: #F6ECD9;
+    --danger: #B23A32;
+    --danger-wash: #F6E3E0;
+    --shadow: 0 1px 2px rgba(20,40,30,.04), 0 6px 20px rgba(20,40,30,.06);
+    --radius: 10px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground: #101512;
+      --surface: #171D19;
+      --surface-sunk: #1D2420;
+      --ink: #E7ECE7;
+      --muted: #A0AAA2;
+      --faint: #7E8880;
+      --hair: #2A322D;
+      --hair-strong: #384038;
+      --accent: #46B79A;
+      --accent-ink: #6FCDB3;
+      --accent-wash: #16302A;
+      --ok: #5CBE86;
+      --ok-wash: #16301F;
+      --warn: #D5A24A;
+      --warn-wash: #33280F;
+      --danger: #E1786F;
+      --danger-wash: #331C19;
+      --shadow: 0 1px 2px rgba(0,0,0,.3), 0 8px 24px rgba(0,0,0,.35);
+    }
+  }
+  :root[data-theme="dark"] {
+    --ground: #101512;
+    --surface: #171D19;
+    --surface-sunk: #1D2420;
+    --ink: #E7ECE7;
+    --muted: #A0AAA2;
+    --faint: #7E8880;
+    --hair: #2A322D;
+    --hair-strong: #384038;
+    --accent: #46B79A;
+    --accent-ink: #6FCDB3;
+    --accent-wash: #16302A;
+    --ok: #5CBE86;
+    --ok-wash: #16301F;
+    --warn: #D5A24A;
+    --warn-wash: #33280F;
+    --danger: #E1786F;
+    --danger-wash: #331C19;
+    --shadow: 0 1px 2px rgba(0,0,0,.3), 0 8px 24px rgba(0,0,0,.35);
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--ink);
+    font-family: "IBM Plex Sans", system-ui, -apple-system, sans-serif;
+    font-size: 17px;
+    line-height: 1.62;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 780px; margin: 0 auto; padding: 0 24px 96px; }
+
+  /* Titrage */
+  h1, h2, h3 { font-family: "Fraunces", Georgia, serif; font-weight: 500; text-wrap: balance; line-height: 1.15; }
+  .eyebrow {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: 12px; letter-spacing: .18em; text-transform: uppercase;
+    color: var(--accent-ink); margin: 0;
+  }
+  .mono { font-family: "IBM Plex Mono", ui-monospace, monospace; }
+
+  /* En-tête */
+  header.doc {
+    padding: 64px 0 34px;
+    border-bottom: 2px solid var(--ink);
+    margin-bottom: 8px;
+  }
+  header.doc h1 {
+    font-size: clamp(2.1rem, 5.5vw, 3.05rem);
+    margin: 14px 0 12px; letter-spacing: -.01em;
+  }
+  header.doc p.lede { font-size: 1.12rem; color: var(--muted); margin: 0 0 22px; max-width: 60ch; }
+  .meta {
+    display: flex; flex-wrap: wrap; gap: 6px 22px;
+    font-family: "IBM Plex Mono", monospace; font-size: 12.5px; color: var(--faint);
+    padding-top: 18px; border-top: 1px solid var(--hair);
+  }
+  .meta b { color: var(--muted); font-weight: 500; }
+
+  /* Sommaire */
+  nav.toc {
+    background: var(--surface); border: 1px solid var(--hair); border-radius: var(--radius);
+    padding: 20px 24px; margin: 30px 0 12px; box-shadow: var(--shadow);
+  }
+  nav.toc p { margin: 0 0 12px; font-family: "IBM Plex Mono", monospace; font-size: 11.5px; letter-spacing: .16em; text-transform: uppercase; color: var(--faint); }
+  nav.toc ol { margin: 0; padding: 0; list-style: none; counter-reset: toc; columns: 2; column-gap: 34px; }
+  nav.toc li { counter-increment: toc; margin: 0 0 9px; break-inside: avoid; }
+  nav.toc a { color: var(--ink); text-decoration: none; display: flex; gap: 12px; align-items: baseline; padding: 2px 0; }
+  nav.toc a::before { content: counter(toc, decimal-leading-zero); font-family: "IBM Plex Mono", monospace; font-size: 12px; color: var(--accent); flex: none; }
+  nav.toc a:hover { color: var(--accent-ink); }
+  @media (max-width: 620px) { nav.toc ol { columns: 1; } }
+
+  /* Sections */
+  section { padding-top: 46px; scroll-margin-top: 20px; }
+  section > h2 {
+    font-size: 1.62rem; margin: 0 0 4px; display: flex; align-items: baseline; gap: 14px;
+  }
+  section > h2 .num {
+    font-family: "IBM Plex Mono", monospace; font-size: .82rem; font-weight: 500;
+    color: var(--accent); flex: none; padding-top: .35em;
+  }
+  .sec-intro { color: var(--muted); margin: 6px 0 0; }
+  h3 { font-size: 1.16rem; margin: 30px 0 8px; }
+  p { margin: 14px 0; }
+  a { color: var(--accent-ink); }
+  strong { font-weight: 600; }
+  .lead-rule { height: 1px; background: var(--hair); border: 0; margin: 4px 0 0; }
+
+  /* UI chips : éléments d'interface cités */
+  .ui {
+    font-family: "IBM Plex Mono", monospace; font-size: .82em;
+    background: var(--surface-sunk); border: 1px solid var(--hair);
+    border-radius: 6px; padding: .12em .45em; white-space: nowrap; color: var(--ink);
+  }
+
+  /* Étapes numérotées */
+  ol.steps { counter-reset: step; list-style: none; margin: 22px 0 0; padding: 0; }
+  ol.steps > li {
+    counter-increment: step; position: relative; padding: 0 0 22px 58px; margin: 0;
+  }
+  ol.steps > li::before {
+    content: counter(step); position: absolute; left: 0; top: -2px;
+    width: 38px; height: 38px; border-radius: 50%;
+    background: var(--accent); color: #fff;
+    font-family: "Fraunces", serif; font-size: 1.15rem; font-weight: 500;
+    display: grid; place-items: center;
+  }
+  ol.steps > li::after {
+    content: ""; position: absolute; left: 18px; top: 40px; bottom: 4px; width: 2px;
+    background: var(--hair);
+  }
+  ol.steps > li:last-child::after { display: none; }
+  ol.steps h3 { margin: 6px 0 4px; }
+  ol.steps p { margin: 6px 0; }
+
+  /* Encadrés / alertes */
+  .callout {
+    border: 1px solid var(--hair); border-left-width: 4px;
+    border-radius: 8px; padding: 15px 18px; margin: 18px 0;
+    background: var(--surface); box-shadow: var(--shadow);
+  }
+  .callout .tag {
+    font-family: "IBM Plex Mono", monospace; font-size: 11.5px; letter-spacing: .1em;
+    text-transform: uppercase; font-weight: 500; display: flex; align-items: center; gap: 8px;
+    margin: 0 0 6px;
+  }
+  .callout p:last-child { margin-bottom: 0; }
+  .callout .glyph { font-size: 15px; }
+  .c-ok { border-left-color: var(--ok); background: var(--ok-wash); }
+  .c-ok .tag { color: var(--ok); }
+  .c-warn { border-left-color: var(--warn); background: var(--warn-wash); }
+  .c-warn .tag { color: var(--warn); }
+  .c-danger { border-left-color: var(--danger); background: var(--danger-wash); }
+  .c-danger .tag { color: var(--danger); }
+  .c-accent { border-left-color: var(--accent); background: var(--accent-wash); }
+  .c-accent .tag { color: var(--accent-ink); }
+
+  /* Tableaux */
+  .tbl-wrap { overflow-x: auto; margin: 20px 0; border: 1px solid var(--hair); border-radius: var(--radius); box-shadow: var(--shadow); }
+  table { border-collapse: collapse; width: 100%; font-size: .95rem; background: var(--surface); }
+  th, td { text-align: left; padding: 12px 16px; border-bottom: 1px solid var(--hair); vertical-align: top; }
+  thead th {
+    font-family: "IBM Plex Mono", monospace; font-size: 11.5px; letter-spacing: .08em;
+    text-transform: uppercase; color: var(--faint); font-weight: 500; background: var(--surface-sunk);
+  }
+  tbody tr:last-child td { border-bottom: 0; }
+  td .name { font-weight: 600; }
+  td.sig { font-family: "IBM Plex Mono", monospace; font-size: .85rem; color: var(--accent-ink); white-space: nowrap; }
+
+  /* Lien de l'application */
+  p.app-link { margin: 14px 0; }
+  p.app-link a {
+    display: inline-flex; align-items: center; gap: 10px;
+    font-family: "IBM Plex Mono", monospace; font-size: 1.02rem; font-weight: 500;
+    color: #fff; background: var(--accent); text-decoration: none;
+    padding: 12px 20px; border-radius: 8px; box-shadow: var(--shadow);
+  }
+  p.app-link a::before { content: "→"; font-size: 1.05em; }
+  p.app-link a:hover { background: var(--accent-ink); }
+
+  /* Bloc commande */
+  pre {
+    background: var(--surface-sunk); border: 1px solid var(--hair); border-radius: 8px;
+    padding: 14px 16px; overflow-x: auto; margin: 14px 0;
+    font-family: "IBM Plex Mono", monospace; font-size: .85rem; color: var(--ink); line-height: 1.5;
+  }
+
+  /* Définitions (indicateurs) */
+  dl.grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; margin: 20px 0; }
+  dl.grid > div { background: var(--surface); border: 1px solid var(--hair); border-radius: 8px; padding: 14px 16px; }
+  dl.grid dt { font-weight: 600; margin: 0 0 3px; }
+  dl.grid dd { margin: 0; color: var(--muted); font-size: .93rem; }
+  @media (max-width: 560px) { dl.grid { grid-template-columns: 1fr; } }
+
+  footer.doc { margin-top: 60px; padding-top: 22px; border-top: 1px solid var(--hair); color: var(--faint); font-family: "IBM Plex Mono", monospace; font-size: 12.5px; }
+
+  /* Bascule thème */
+  .theme-btn {
+    position: fixed; top: 16px; right: 16px; z-index: 10;
+    background: var(--surface); color: var(--muted); border: 1px solid var(--hair-strong);
+    border-radius: 999px; padding: 7px 14px; cursor: pointer;
+    font-family: "IBM Plex Mono", monospace; font-size: 12px; box-shadow: var(--shadow);
+  }
+  .theme-btn:hover { color: var(--accent-ink); border-color: var(--accent); }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+
+  @media print {
+    .theme-btn { display: none; }
+    body { background: #fff; font-size: 11pt; }
+    .callout, .tbl-wrap, nav.toc, dl.grid > div { box-shadow: none; }
+    section { padding-top: 24px; }
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    html { scroll-behavior: smooth; }
+  }
+</style>
+</head>
+<body>
+<button class="theme-btn" id="themeBtn" type="button" aria-label="Changer de thème">☾ Thème</button>
+
+<div class="wrap">
+
+  <header class="doc">
+    <p class="eyebrow">Manuel de procédure</p>
+    <h1>Rapprochement bancaire automatique</h1>
+    <p class="lede">Confronter un relevé bancaire à votre grand livre comptable et obtenir, en un clic, la liste des opérations rapprochées et des écarts à traiter.</p>
+    <div class="meta">
+      <span><b>Destiné à</b> : service comptable</span>
+      <span><b>Entrées</b> : relevé PDF + grand livre Excel</span>
+      <span><b>Sortie</b> : classeur Excel 3 feuilles</span>
+      <span><b>Version</b> : 1.0</span>
+    </div>
+  </header>
+
+  <nav class="toc" aria-label="Sommaire">
+    <p>Sommaire</p>
+    <ol>
+      <li><a href="#role">À quoi sert l'outil</a></li>
+      <li><a href="#prerequis">Ce qu'il vous faut</a></li>
+      <li><a href="#ouvrir">Ouvrir l'outil</a></li>
+      <li><a href="#lancer">Lancer un rapprochement</a></li>
+      <li><a href="#resultats">Lire l'écran de résultats</a></li>
+      <li><a href="#controles">Les contrôles et alertes</a></li>
+      <li><a href="#ecarts">Traiter les écarts</a></li>
+      <li><a href="#vigilance">Points de vigilance</a></li>
+      <li><a href="#depannage">En cas de problème</a></li>
+    </ol>
+  </nav>
+
+  <section id="role">
+    <h2><span class="num">01</span> À quoi sert l'outil</h2>
+    <p class="sec-intro">Comprendre en une minute ce que l'outil fait — et ce qu'il ne fait pas.</p>
+    <p>L'outil compare automatiquement deux documents portant sur la <strong>même période</strong> et le <strong>même compte</strong> :</p>
+    <dl class="grid">
+      <div><dt>Le relevé bancaire</dt><dd>Le PDF fourni par la banque, tel qu'il vous est transmis.</dd></div>
+      <div><dt>Le grand livre</dt><dd>L'extraction Excel du compte « banque » de votre comptabilité.</dd></div>
+    </dl>
+    <p>Il apparie les opérations qui correspondent de part et d'autre, puis produit un classeur Excel à trois feuilles : les opérations <strong>rapprochées</strong>, celles <strong>présentes en banque mais absentes de la compta</strong>, et celles <strong>présentes en compta mais absentes de la banque</strong>.</p>
+    <div class="callout c-accent">
+      <p class="tag"><span class="glyph">◆</span> À retenir</p>
+      <p>L'outil <strong>prépare et fiabilise</strong> le rapprochement ; il ne le valide pas à votre place. Les opérations qu'il ne parvient pas à apparier ne sont pas des erreurs de l'outil : ce sont les points que vous devez examiner.</p>
+    </div>
+  </section>
+
+  <section id="prerequis">
+    <h2><span class="num">02</span> Ce qu'il vous faut</h2>
+    <p class="sec-intro">Deux fichiers, dans les bons formats.</p>
+    <h3>Le relevé bancaire — au format PDF</h3>
+    <p>Le PDF d'origine de la banque, non modifié. L'outil sait lire les relevés où une seule des colonnes <em>Débit</em> / <em>Crédit</em> est renseignée par ligne, y compris lorsque les montants utilisent l'espace comme séparateur de milliers (<span class="ui">200 000</span>).</p>
+    <h3>Le grand livre — au format Excel</h3>
+    <p>Un fichier <span class="ui">.xlsx</span> ou <span class="ui">.xls</span> contenant au minimum une colonne <strong>date</strong>, une colonne <strong>libellé</strong>, et soit des colonnes <strong>Débit</strong> et <strong>Crédit</strong>, soit une colonne <strong>Montant</strong>. Limitez l'extraction au <strong>compte banque</strong> et à la <strong>période du relevé</strong>.</p>
+    <div class="callout c-warn">
+      <p class="tag"><span class="glyph">⚠︎</span> Attention aux données sensibles</p>
+      <p>Ces fichiers contiennent des données bancaires nominatives. Ne les déposez que dans l'outil prévu, et ne les diffusez pas.</p>
+    </div>
+  </section>
+
+  <section id="ouvrir">
+    <h2><span class="num">03</span> Ouvrir l'outil</h2>
+    <p class="sec-intro">L'outil s'utilise dans un navigateur web — rien à installer.</p>
+    <p>Rendez-vous à l'adresse de l'application :</p>
+    <p class="app-link">
+      <a href="https://rapprochement-facile.streamlit.app/" target="_blank" rel="noopener">rapprochement-facile.streamlit.app</a>
+    </p>
+    <p>Ajoutez-la à vos favoris pour la retrouver facilement. Une page « <strong>Assistant de Rapprochement Bancaire</strong> » s'affiche : deux zones de dépôt de fichiers au centre, et un panneau de <strong>paramètres</strong> sur la gauche.</p>
+    <div class="callout c-warn">
+      <p class="tag"><span class="glyph">⚠︎</span> Mise en veille</p>
+      <p>L'application peut se mettre en veille après une période d'inactivité. Si un message « <em>wake up</em> » apparaît, cliquez sur le bouton proposé et patientez quelques secondes : elle redémarre d'elle-même.</p>
+    </div>
+  </section>
+
+  <section id="lancer">
+    <h2><span class="num">04</span> Lancer un rapprochement</h2>
+    <p class="sec-intro">Trois gestes suffisent ; le réglage des curseurs est facultatif.</p>
+    <ol class="steps">
+      <li>
+        <h3>Déposer le relevé bancaire</h3>
+        <p>Sous <span class="ui">1. Relevé Bancaire</span>, glissez le PDF ou cliquez pour le sélectionner.</p>
+      </li>
+      <li>
+        <h3>Déposer le grand livre</h3>
+        <p>Sous <span class="ui">2. Grand Livre Comptable</span>, déposez le fichier Excel. Tant que les deux fichiers ne sont pas chargés, le bouton de lancement reste inactif.</p>
+      </li>
+      <li>
+        <h3>Ajuster les paramètres (facultatif)</h3>
+        <p>Dans le panneau de gauche, deux curseurs affinent l'appariement :</p>
+        <p><span class="ui">Tolérance sur la date (jours)</span> — écart de date maximal accepté entre banque et compta. Défaut : <strong>4 jours</strong>.</p>
+        <p><span class="ui">Similarité minimale des libellés (%)</span> — plus la valeur est basse, plus l'outil rapproche, au risque d'appariements erronés. Défaut : <strong>80 %</strong>.</p>
+        <p>Ces deux réglages n'influencent que le rapprochement <em>partiel</em> (voir §7) ; laissez-les tels quels en cas de doute.</p>
+      </li>
+      <li>
+        <h3>Lancer</h3>
+        <p>Cliquez sur <span class="ui">🚀 Lancer le Rapprochement</span>. Le traitement dure quelques secondes.</p>
+      </li>
+    </ol>
+  </section>
+
+  <section id="resultats">
+    <h2><span class="num">05</span> Lire l'écran de résultats</h2>
+    <p class="sec-intro">Les chiffres clés en haut, le détail dans les onglets, le classeur à télécharger en bas.</p>
+    <h3>Les quatre indicateurs</h3>
+    <dl class="grid">
+      <div><dt>Opérations Rapprochées</dt><dd>Nombre d'opérations appariées entre les deux sources.</dd></div>
+      <div><dt>Manquants en Compta</dt><dd>Présentes en banque, introuvables en comptabilité.</dd></div>
+      <div><dt>Manquants en Banque</dt><dd>Présentes en compta, introuvables sur le relevé.</dd></div>
+      <div><dt>Taux de rapprochement</dt><dd>Part des opérations bancaires appariées.</dd></div>
+    </dl>
+    <h3>Les trois onglets</h3>
+    <p>Ils reprennent le détail ligne à ligne : <span class="ui">✅ Rapprochées</span>, <span class="ui">🏦 Dans la banque, absentes en compta</span> et <span class="ui">📒 En compta, absentes de la banque</span>.</p>
+    <h3>Le classeur Excel</h3>
+    <p>Le bouton <span class="ui">📥 Télécharger le fichier de résultat Excel</span> enregistre <span class="ui">resultat_rapprochement.xlsx</span>, avec une feuille par onglet plus, le cas échéant, une feuille <span class="ui">Contrôles extraction</span>. C'est ce fichier que vous conservez comme pièce de rapprochement.</p>
+  </section>
+
+  <section id="controles">
+    <h2><span class="num">06</span> Les contrôles et alertes</h2>
+    <p class="sec-intro">Avant d'exploiter un résultat, lisez toujours le bandeau de contrôle. Il vous dit si l'extraction du relevé est fiable.</p>
+    <p>L'outil recoupe ce qu'il a lu dans le PDF avec les totaux imprimés en pied de relevé (nombre d'opérations, total des mouvements, solde de clôture recalculé). Trois situations possibles :</p>
+    <div class="callout c-ok">
+      <p class="tag"><span class="glyph">✔</span> Extraction vérifiée</p>
+      <p>Les totaux lus correspondent à ceux du relevé. Le tableau de contrôle (colonnes <em>Extrait</em>, <em>Annoncé par le relevé</em>, <em>Écart</em>) affiche un <strong>écart nul partout</strong>. Vous pouvez exploiter le résultat en confiance.</p>
+    </div>
+    <div class="callout c-danger">
+      <p class="tag"><span class="glyph">⛔</span> Écart détecté</p>
+      <p>Les totaux ne concordent pas : des opérations ont été mal lues ou omises. <strong>Le rapprochement n'est pas fiable</strong> — ne l'exploitez pas et signalez le relevé au support.</p>
+    </div>
+    <div class="callout c-warn">
+      <p class="tag"><span class="glyph">⚠︎</span> Non vérifiable</p>
+      <p>Le relevé ne porte aucun total de contrôle exploitable : l'extraction n'a pas pu être vérifiée automatiquement. Le résultat peut être bon, mais <strong>recoupez vous-même</strong> le nombre d'opérations et les totaux avant de le valider.</p>
+    </div>
+    <h3>Alerte sur le sens des montants</h3>
+    <p>Un message <span class="ui">⚠️ …convention Débit/Crédit…</span> signale que les montants concorderaient bien mieux en inversant le signe de la comptabilité. C'est le signe d'une colonne Débit/Crédit inversée dans l'extraction du grand livre : corrigez l'export avant d'exploiter le résultat.</p>
+  </section>
+
+  <section id="ecarts">
+    <h2><span class="num">07</span> Traiter les écarts</h2>
+    <p class="sec-intro">Les opérations non rapprochées sont le cœur de votre travail : chacune a une explication.</p>
+    <p>Une opération peut apparaître dans l'une des deux feuilles « manquants » pour des raisons parfaitement normales : chèque émis mais pas encore encaissé, écriture passée sur une autre période, report à nouveau hors périmètre du relevé, ou différence à corriger dans un des deux systèmes.</p>
+    <h3>Comment l'outil apparie — trois niveaux</h3>
+    <p>La colonne <span class="ui">Type_Match</span> du résultat indique comment chaque opération a été rapprochée :</p>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>Type de correspondance</th><th>Règle appliquée</th></tr></thead>
+        <tbody>
+          <tr><td><span class="name">Parfait</span></td><td>Même montant <em>et</em> même date.</td></tr>
+          <tr><td><span class="name">Numéro de chèque</span></td><td>Même montant et même numéro de chèque, quelle que soit la date — la banque date l'encaissement, la compta l'émission.</td></tr>
+          <tr><td><span class="name">Partiel</span></td><td>Même montant, date proche (dans la tolérance) et libellés suffisamment ressemblants.</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="callout c-accent">
+      <p class="tag"><span class="glyph">◆</span> Marche à suivre</p>
+      <p>Pour chaque ligne restée non rapprochée, cherchez sa contrepartie dans l'autre feuille (souvent même montant, à une date ou un libellé près). Si vous la trouvez : c'est un simple décalage, à documenter. Si vous ne la trouvez pas : c'est une vraie différence à corriger dans la banque ou la comptabilité.</p>
+    </div>
+  </section>
+
+  <section id="vigilance">
+    <h2><span class="num">08</span> Points de vigilance</h2>
+    <p class="sec-intro">Quelques principes qui expliquent la plupart des résultats surprenants.</p>
+    <h3>Le compte banque de la compta est le miroir du relevé</h3>
+    <p>Une entrée d'argent est un <strong>crédit</strong> à la banque, mais un <strong>débit</strong> en comptabilité. L'outil en tient compte automatiquement :</p>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>Source</th><th>Montant calculé</th></tr></thead>
+        <tbody>
+          <tr><td>Relevé bancaire</td><td class="sig">crédit − débit</td></tr>
+          <tr><td>Grand livre</td><td class="sig">débit − crédit</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p>C'est pourquoi une inversion de colonnes dans l'export du grand livre fait chuter le rapprochement — d'où l'alerte du §6.</p>
+    <h3>Les montants sont comparés au centime près</h3>
+    <p>L'égalité des montants est stricte : aucune tolérance en centimes. Une différence d'arrondi laissera l'opération non rapprochée.</p>
+    <h3>Les numéros de chèque doivent concorder</h3>
+    <p>L'appariement par chèque ignore les zéros de tête (<span class="ui">0412083</span> = <span class="ui">412083</span>), mais pas une différence de chiffre : un numéro divergent entre banque et compta reste à arbitrer à la main.</p>
+    <h3>Un relevé sans totaux n'est pas vérifié automatiquement</h3>
+    <p>Sur ce type de relevé, le garde-fou d'extraction ne peut pas se prononcer (§6, alerte orange) : le recoupement manuel vous revient.</p>
+  </section>
+
+  <section id="depannage">
+    <h2><span class="num">09</span> En cas de problème</h2>
+    <p class="sec-intro">Les situations les plus courantes et la conduite à tenir.</p>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>Symptôme</th><th>Cause probable &amp; solution</th></tr></thead>
+        <tbody>
+          <tr><td><span class="name">Le bouton de lancement reste grisé</span></td><td>Un des deux fichiers n'est pas chargé. Vérifiez que le relevé <em>et</em> le grand livre sont bien déposés.</td></tr>
+          <tr><td><span class="name">« Aucune opération n'a pu être extraite »</span></td><td>Le PDF n'expose pas de colonnes Débit/Crédit lisibles (relevé scanné en image, format inhabituel). Fournissez le PDF d'origine de la banque, non scanné.</td></tr>
+          <tr><td><span class="name">Écart détecté (bandeau rouge)</span></td><td>Extraction incomplète ou erronée. N'exploitez pas le résultat ; transmettez le relevé au support.</td></tr>
+          <tr><td><span class="name">Taux de rapprochement très bas</span></td><td>Souvent une inversion Débit/Crédit à l'export du grand livre (voir l'alerte de sens), ou une période / un compte qui ne correspondent pas au relevé.</td></tr>
+          <tr><td><span class="name">« Colonnes date ou libellé introuvables »</span></td><td>Le grand livre ne contient pas les colonnes attendues. Renommez-les clairement (date, libellé, débit, crédit) et ré-exportez.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <footer class="doc">
+    Manuel de procédure · Rapprochement bancaire automatique · v1.0
+  </footer>
+
+</div>
+
+<script>
+  (function () {
+    var btn = document.getElementById("themeBtn");
+    var root = document.documentElement;
+    function current() {
+      var explicit = root.getAttribute("data-theme");
+      if (explicit) return explicit;
+      return window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+    }
+    function apply(mode) {
+      root.setAttribute("data-theme", mode);
+      btn.textContent = mode === "dark" ? "☀ Thème" : "☾ Thème";
+      try { localStorage.setItem("manuel-theme", mode); } catch (e) {}
+    }
+    try {
+      var saved = localStorage.getItem("manuel-theme");
+      if (saved) apply(saved); else btn.textContent = current() === "dark" ? "☀ Thème" : "☾ Thème";
+    } catch (e) {}
+    btn.addEventListener("click", function () {
+      apply(current() === "dark" ? "light" : "dark");
+    });
+  })();
+</script>
+</body>
+</html>

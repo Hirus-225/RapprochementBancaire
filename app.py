@@ -10,11 +10,16 @@ import re
 import unicodedata
 from collections import Counter
 from datetime import datetime
+from pathlib import Path
 
 import pandas as pd
 import pdfplumber
 import streamlit as st
+import streamlit.components.v1 as components
 from thefuzz import fuzz
+
+# Manuel de procédure embarqué : servi tel quel dans l'onglet dédié de l'app.
+_CHEMIN_MANUEL = Path(__file__).with_name("manuel.html")
 
 # Valeurs par défaut des tolérances de l'étape 2 (réglables depuis l'interface).
 TOLERANCE_JOURS = 4
@@ -23,6 +28,8 @@ SCORE_MINIMUM = 80
 _MOTIF_DATE = re.compile(r"^\d{1,2}[/-]\d{1,2}[/-]\d{2,4}$")
 _MOTIF_NOMBRE = re.compile(r"^-?[\d.,]+$")
 _MOTIF_NUMERO_PAGE = re.compile(r"^\d{1,3}\s*/\s*\d{1,3}$")
+# Numéro de chèque : suite de chiffres suivant un marqueur « N° » / « N ».
+_MOTIF_NUMERO_CHEQUE = re.compile(r"\bN\s*°?\s*(\d{3,})")
 
 # Mots-clés permettant de repérer chaque colonne dans la ligne d'en-tête du PDF.
 _MOTS_ENTETE = {
@@ -244,30 +251,79 @@ def _extraire_par_coordonnees(pdf):
   return operations, controles
 
 
+def _colonnes_du_tableau(cellules_normalisees):
+  """Repère la position des colonnes utiles sur une ligne d'en-tête de tableau.
+
+  Renvoie None si la ligne n'est pas un en-tête (il faut au minimum les colonnes
+  Débit et Crédit pour situer les montants).
+  """
+  if "debit" not in cellules_normalisees or "credit" not in cellules_normalisees:
+    return None
+  return {
+      "debit": cellules_normalisees.index("debit"),
+      "credit": cellules_normalisees.index("credit"),
+      "date": next(
+          (i for i, c in enumerate(cellules_normalisees) if "date" in c), None
+      ),
+      "libelle": next(
+          (
+              i
+              for i, c in enumerate(cellules_normalisees)
+              if any(x in c for x in ("libelle", "operation", "intitule"))
+          ),
+          None,
+      ),
+  }
+
+
 def _extraire_par_tableaux(pdf):
-  """Repli pour les relevés dont les tableaux sont détectables par pdfplumber."""
+  """Extrait les opérations en s'appuyant sur le découpage en cellules.
+
+  Chemin adapté aux relevés dont les tableaux sont détectables par pdfplumber :
+  contrairement au parseur par coordonnées, le découpage en cellules regroupe
+  correctement les libellés longs, y compris quand ils débordent visuellement
+  sous les colonnes numériques. La ligne d'en-tête — relue chaque fois qu'elle
+  apparaît — donne la position des colonnes Débit et Crédit : indispensable car
+  une seule des deux est renseignée par opération.
+  """
   operations = []
+  colonnes = None
   for page in pdf.pages:
     for table in page.extract_tables():
       for ligne in table:
         cellules = [str(c).strip() if c is not None else "" for c in ligne]
-        texte = _normaliser(" ".join(cellules))
-        if "date" in texte and ("libell" in texte or "debit" in texte):
+        entete = _colonnes_du_tableau([_normaliser(c) for c in cellules])
+        if entete:
+          colonnes = entete
           continue
 
-        remplies = [c for c in cellules if c]
-        if len(remplies) < 4:
-          continue
-
-        date_val = next((c for c in remplies if _MOTIF_DATE.match(c)), None)
+        date_val = next((c for c in cellules if _MOTIF_DATE.match(c)), None)
         if not date_val:
           continue
 
-        debit = _en_nombre(remplies[-2]) or 0.0
-        credit = _en_nombre(remplies[-1]) or 0.0
-        libelle = " ".join(
-            c for c in remplies if c != date_val and not _MOTIF_NOMBRE.match(c)
-        )
+        # Avec l'en-tête connu, on lit chaque montant à sa colonne. Sinon on
+        # retombe sur l'heuristique de position (deux dernières cellules pleines).
+        if colonnes and max(colonnes["debit"], colonnes["credit"]) < len(cellules):
+          debit = _en_nombre(cellules[colonnes["debit"]]) or 0.0
+          credit = _en_nombre(cellules[colonnes["credit"]]) or 0.0
+          col_libelle = colonnes["libelle"]
+          if col_libelle is not None and col_libelle < len(cellules):
+            libelle = cellules[col_libelle]
+          else:
+            libelle = " ".join(
+                c for c in cellules
+                if c != date_val and not _MOTIF_NOMBRE.match(c)
+            )
+        else:
+          remplies = [c for c in cellules if c]
+          if len(remplies) < 4:
+            continue
+          debit = _en_nombre(remplies[-2]) or 0.0
+          credit = _en_nombre(remplies[-1]) or 0.0
+          libelle = " ".join(
+              c for c in remplies if c != date_val and not _MOTIF_NOMBRE.match(c)
+          )
+
         operations.append({
             "date": date_val,
             "libelle": libelle,
@@ -462,16 +518,34 @@ def nettoyer_donnees(df):
   return df.reset_index(drop=True)
 
 
+def _numero_cheque(libelle):
+  """Extrait le numéro de chèque d'un libellé, zéros de tête ignorés.
+
+  Le numéro suit un marqueur « N° » / « N » ; renvoie None en son absence (agios,
+  frais, retraits… n'en portent pas). Normaliser les zéros de tête est
+  indispensable : la banque écrit « N° 0412083 » là où la compta écrit
+  « N°412083 » — sans quoi le numéro, seul jeton discriminant entre les deux
+  libellés, ne concorde même pas.
+  """
+  correspondance = _MOTIF_NUMERO_CHEQUE.search(str(libelle).upper())
+  if not correspondance:
+    return None
+  return correspondance.group(1).lstrip("0") or "0"
+
+
 def executer_rapprochement(
     df_banque,
     df_compta,
     tolerance_jours=TOLERANCE_JOURS,
     score_minimum=SCORE_MINIMUM,
 ):
-  """Rapproche les deux sources en deux passes.
+  """Rapproche les deux sources en trois passes.
 
   1. Match parfait : même montant et même date.
-  2. Match partiel : même montant, date à ±`tolerance_jours` jours et
+  2. Match par numéro de chèque : même montant et même numéro de chèque, quelle
+     que soit la date (la compta date le chèque à l'émission, la banque à
+     l'encaissement — l'écart dépasse souvent la tolérance).
+  3. Match partiel : même montant, date à ±`tolerance_jours` jours et
      similarité des libellés > `score_minimum`.
   """
   b = df_banque.copy()
@@ -527,7 +601,39 @@ def executer_rapprochement(
     )
     enregistrer(idx_b, row_b, idx_c, c.loc[idx_c], "Parfait", 100)
 
-  # Étape 2 : montant identique, date tolérée, libellés proches.
+  # Étape 2 : même montant et même numéro de chèque, sans contrainte de date.
+  # Le numéro identifie l'opération de façon fiable même quand les libellés
+  # diffèrent (« SORT DE CHEQUE CHQ N° 0412083 » côté banque contre
+  # « CHQ N°412083 CHIMIE COLLECTIVITES » côté compta).
+  b["cheque"] = b["libelle"].map(_numero_cheque)
+  c["cheque"] = c["libelle"].map(_numero_cheque)
+  for idx_b, row_b in b[b["statut"] == "Non rapproché"].iterrows():
+    if not row_b["cheque"]:
+      continue
+    candidats = c[
+        (c["statut"] == "Non rapproché")
+        & (c["montant"] == row_b["montant"])
+        & (c["cheque"] == row_b["cheque"])
+    ]
+    if candidats.empty:
+      continue
+    date_b = datetime.strptime(row_b["date"], "%Y-%m-%d")
+    idx_c = min(
+        candidats.index,
+        key=lambda i: abs(
+            (date_b - datetime.strptime(c.at[i, "date"], "%Y-%m-%d")).days
+        ),
+    )
+    enregistrer(
+        idx_b,
+        row_b,
+        idx_c,
+        c.loc[idx_c],
+        "Numéro de chèque",
+        fuzz.token_set_ratio(row_b["libelle"], c.at[idx_c, "libelle"]),
+    )
+
+  # Étape 3 : montant identique, date tolérée, libellés proches.
   for idx_b, row_b in b[b["statut"] == "Non rapproché"].iterrows():
     date_b = datetime.strptime(row_b["date"], "%Y-%m-%d")
     candidats = c[
@@ -574,6 +680,19 @@ def ecrire_resultats(writer, df_rap, df_mq_compta, df_mq_banque, df_controles=No
     df_controles.to_excel(writer, sheet_name="Contrôles extraction", index=False)
 
 
+def _afficher_manuel():
+  """Affiche le manuel de procédure (page HTML autonome) dans l'application."""
+  try:
+    manuel = _CHEMIN_MANUEL.read_text(encoding="utf-8")
+  except OSError:
+    st.error(
+        "Le manuel de procédure est introuvable. Vérifiez que le fichier"
+        f" `{_CHEMIN_MANUEL.name}` est bien présent à côté de `app.py`."
+    )
+    return
+  components.html(manuel, height=900, scrolling=True)
+
+
 def _afficher_controles(statut, tableau):
   """Affiche le recoupement entre l'extraction et les totaux du relevé."""
   if statut is None:
@@ -602,6 +721,21 @@ def _interface():
       page_icon="📊",
       layout="wide",
   )
+
+  _PAGE_RAPP = "🔄 Rapprochement"
+  _PAGE_MANUEL = "📘 Manuel de procédure"
+  with st.sidebar:
+    page = st.radio("Navigation", (_PAGE_RAPP, _PAGE_MANUEL))
+    st.divider()
+
+  if page == _PAGE_MANUEL:
+    st.title("📘 Manuel de procédure")
+    st.caption(
+        "Guide d'utilisation de l'assistant. Revenez au rapprochement via la"
+        " barre latérale."
+    )
+    _afficher_manuel()
+    return
 
   st.title("📊 Assistant de Rapprochement Bancaire")
   st.markdown(
