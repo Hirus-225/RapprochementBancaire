@@ -28,7 +28,7 @@ _STYLE = """
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap');
 
-/* Bordure translucide et accent : lisibles en thème clair comme sombre. */
+/* Bordure translucide et accent de l'habillage. */
 :root { --trait: rgba(130,142,133,.30); --accent-fonce: #0A5A49; }
 
 html, body, .stApp, [data-testid="stAppViewContainer"],
@@ -41,7 +41,7 @@ html, body, .stApp, [data-testid="stAppViewContainer"],
 .material-symbols-rounded, .material-symbols-outlined {
   font-family: 'Material Symbols Rounded', 'Material Symbols Outlined', 'Material Icons' !important;
 }
-/* Titres en Fraunces ; on n'impose pas la couleur (héritée du thème actif). */
+/* Titres en Fraunces ; la couleur vient du thème clair de config.toml. */
 h1, h2, h3, h4,
 [data-testid="stHeading"] h1, [data-testid="stHeading"] h2, [data-testid="stHeading"] h3 {
   font-family: "Fraunces", Georgia, serif !important;
@@ -52,7 +52,7 @@ h1 { font-size: 2.25rem !important; }
 /* Colonne principale : allure de document */
 .block-container { max-width: 1060px; padding-top: 2.6rem; padding-bottom: 4rem; }
 
-/* Épure : masque le bouton Deploy et le liseré, garde le menu ⋮ (Réglages → Thème) */
+/* Épure : masque le bouton Deploy et le liseré, garde le menu ⋮ */
 [data-testid="stAppDeployButton"], [data-testid="stDecoration"], footer { display: none !important; }
 header[data-testid="stHeader"] { background: transparent; }
 
@@ -67,7 +67,7 @@ header[data-testid="stHeader"] { background: transparent; }
 }
 .stButton > button[kind="primary"]:hover { background: var(--accent-fonce); border-color: var(--accent-fonce); }
 
-/* Indicateurs, façon fiches — fond transparent + bordure : tient sur les deux thèmes. */
+/* Indicateurs, façon fiches — fond transparent + bordure fine. */
 [data-testid="stMetric"] {
   background: transparent; border: 1px solid var(--trait); border-radius: 10px; padding: .9rem 1.05rem;
 }
@@ -87,84 +87,10 @@ header[data-testid="stHeader"] { background: transparent; }
 """
 
 
-# Surcouche « mode sombre », appliquée par-dessus l'habillage de base quand
-# l'interrupteur est activé. On peint explicitement les surfaces Streamlit
-# (les couleurs héritées ne suffisent pas), les tableaux étant traités à part
-# via un Styler (voir `_tableau`).
-_STYLE_SOMBRE = """
-<style>
-:root { --trait: rgba(150,162,152,.22); }
-.stApp, [data-testid="stAppViewContainer"], [data-testid="stMain"] { background-color: #121814 !important; }
-[data-testid="stHeader"] { background: transparent !important; }
-[data-testid="stSidebar"] { background-color: #171E19 !important; }
-
-/* Texte clair sur fond sombre */
-.stApp, h1, h2, h3, h4, label,
-[data-testid="stMarkdownContainer"], [data-testid="stMarkdownContainer"] *,
-[data-testid="stWidgetLabel"], [data-testid="stWidgetLabel"] *,
-[data-testid="stMetricValue"], [data-testid="stTabs"] { color: #E8ECE8 !important; }
-[data-testid="stMetricLabel"] * { color: #A6B0A8 !important; }
-/* Légendes (st.caption) : gris lisible plutôt que le gris sombre par défaut */
-[data-testid="stCaptionContainer"], [data-testid="stCaptionContainer"] * { color: #9FA9A1 !important; }
-
-/* Champs, zones de dépôt, expander, alertes */
-[data-testid="stFileUploaderDropzone"],
-[data-testid="stExpander"] details,
-.stAlert, [data-baseweb="notification"] { background-color: #1B221D !important; }
-.stAlert * { color: #E8ECE8 !important; }
-[data-testid="stExpander"] { border-color: var(--trait) !important; }
-/* Texte d'aide des zones de dépôt (« 200MB per file… », consignes) */
-[data-testid="stFileUploaderDropzone"], [data-testid="stFileUploaderDropzone"] * { color: #C7D0C9 !important; }
-[data-testid="stFileUploaderDropzone"] button {
-  background-color: #212A24 !important; color: #E8ECE8 !important; border-color: var(--trait) !important;
-}
-/* Icônes Material colorées par le thème clair (chevron latéral, aide) : à éclaircir */
-[data-testid="stIconMaterial"] { color: #C3CDC5 !important; }
-/* Infobulles d'aide (survol du « ? ») : fond sombre + texte clair */
-[data-testid="stTooltipContent"] { background-color: #0E1310 !important; border: 1px solid var(--trait) !important; }
-[data-testid="stTooltipContent"] * { color: #E8ECE8 !important; }
-
-/* Boutons secondaires et téléchargement (le bouton principal garde l'accent) */
-.stButton > button:not([kind="primary"]),
-[data-testid="stDownloadButton"] > button {
-  background-color: #1B221D; color: #E8ECE8;
-}
-</style>
-"""
-
-
 def _appliquer_style():
-  """Injecte l'habillage épuré, plus la surcouche sombre si elle est activée."""
+  """Injecte l'habillage épuré de l'application."""
   st.markdown(_STYLE, unsafe_allow_html=True)
-  if st.session_state.get("theme") == "dark":
-    st.markdown(_STYLE_SOMBRE, unsafe_allow_html=True)
 
-
-def _tableau(df):
-  """Prépare un DataFrame pour `st.dataframe`, teinté en mode sombre.
-
-  Les tableaux Streamlit sont rendus sur un canvas insensible au CSS : on passe
-  donc les couleurs via un Styler quand le mode sombre est actif.
-  """
-  if st.session_state.get("theme") == "dark":
-    return df.style.set_properties(
-        **{"background-color": "#171E19", "color": "#E8ECE8"}
-    )
-  return df
-
-
-def _selecteur_theme():
-  """Interrupteur clair/sombre dans la barre latérale.
-
-  Le mode est mémorisé dans `st.session_state` et appliqué par du CSS injecté
-  (voir `_appliquer_style`), indépendamment du thème natif de Streamlit — ce qui
-  garantit une bascule immédiate et fiable dans l'application.
-  """
-  sombre = st.toggle("Mode sombre", value=(st.session_state.get("theme") == "dark"))
-  nouveau = "dark" if sombre else "light"
-  if nouveau != st.session_state.get("theme"):
-    st.session_state["theme"] = nouveau
-    st.rerun()
 
 # Valeurs par défaut des tolérances de l'étape 2 (réglables depuis l'interface).
 TOLERANCE_JOURS = 4
@@ -835,11 +761,10 @@ def _afficher_manuel():
         f" `{_CHEMIN_MANUEL.name}` est bien présent à côté de `app.py`."
     )
     return
-  # Le manuel suit le thème choisi dans l'application pour rester cohérent ;
-  # son bouton « Thème » permet ensuite de basculer manuellement.
-  theme_type = st.session_state.get("theme", "light")
+  # L'application est en thème clair : on force le manuel en clair pour rester
+  # cohérent (il est théma-conscient et suivrait sinon le système).
   manuel = manuel.replace(
-      '<html lang="fr">', f'<html lang="fr" data-theme="{theme_type}">', 1
+      '<html lang="fr">', '<html lang="fr" data-theme="light">', 1
   )
   components.html(manuel, height=900, scrolling=True)
 
@@ -855,14 +780,14 @@ def _afficher_controles(statut, tableau):
     return
   if statut:
     with st.expander("Extraction vérifiée sur les totaux du relevé"):
-      st.dataframe(_tableau(tableau), use_container_width=True, hide_index=True)
+      st.dataframe(tableau, use_container_width=True, hide_index=True)
   else:
     st.error(
         "L'extraction ne correspond pas aux totaux imprimés sur le relevé :"
         " des opérations ont été mal lues ou omises. Le rapprochement ci-dessous"
         " n'est pas fiable."
     )
-    st.dataframe(_tableau(tableau), use_container_width=True, hide_index=True)
+    st.dataframe(tableau, use_container_width=True, hide_index=True)
 
 
 def _interface():
@@ -879,7 +804,6 @@ def _interface():
   with st.sidebar:
     st.caption("RAPPROCHEMENT BANCAIRE")
     page = st.radio("Navigation", (_PAGE_RAPP, _PAGE_MANUEL), label_visibility="collapsed")
-    _selecteur_theme()
     st.divider()
 
   if page == _PAGE_MANUEL:
@@ -993,9 +917,9 @@ def _interface():
           f"Dans la banque, absentes en compta ({len(df_mq_compta)})",
           f"En compta, absentes de la banque ({len(df_mq_banque)})",
       ])
-      onglet1.dataframe(_tableau(df_rap), use_container_width=True, hide_index=True)
-      onglet2.dataframe(_tableau(df_mq_compta), use_container_width=True, hide_index=True)
-      onglet3.dataframe(_tableau(df_mq_banque), use_container_width=True, hide_index=True)
+      onglet1.dataframe(df_rap, use_container_width=True, hide_index=True)
+      onglet2.dataframe(df_mq_compta, use_container_width=True, hide_index=True)
+      onglet3.dataframe(df_mq_banque, use_container_width=True, hide_index=True)
 
       output = io.BytesIO()
       with pd.ExcelWriter(output, engine="openpyxl") as writer:

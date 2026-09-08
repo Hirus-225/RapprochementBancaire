@@ -1,6 +1,6 @@
 [theme]
-# Base claire stable. Le mode sombre est proposé par un interrupteur dans l'app
-# (habillage CSS injecté), indépendant du thème natif de Streamlit.
+# Thème clair imposé : l'application n'a qu'un seul rendu, y compris pour les
+# utilisateurs dont le système est en sombre.
 base = "light"
 primaryColor = "#0E7A63"
 font = "sans serif"
