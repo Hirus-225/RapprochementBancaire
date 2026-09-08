@@ -21,6 +21,76 @@ from thefuzz import fuzz
 # Manuel de procédure embarqué : servi tel quel dans l'onglet dédié de l'app.
 _CHEMIN_MANUEL = Path(__file__).with_name("manuel.html")
 
+# Habillage épuré, cohérent avec le manuel (typographies Fraunces + IBM Plex,
+# palette « grand livre »). Les couleurs de fond/texte viennent de config.toml ;
+# cette feuille ne fait que la typographie, l'espacement et le style des blocs.
+_STYLE = """
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap');
+
+/* Bordure translucide et accent : lisibles en thème clair comme sombre. */
+:root { --trait: rgba(130,142,133,.30); --accent-fonce: #0A5A49; }
+
+html, body, .stApp, [data-testid="stAppViewContainer"],
+[data-testid="stMarkdownContainer"], [data-testid="stWidgetLabel"],
+.stButton, .stRadio, .stMetric, .stTabs {
+  font-family: "IBM Plex Sans", system-ui, -apple-system, sans-serif;
+}
+/* Ne jamais toucher aux icônes Material de Streamlit (sinon ligatures en clair). */
+[data-testid="stIconMaterial"], .material-icons, .material-icons-outlined,
+.material-symbols-rounded, .material-symbols-outlined {
+  font-family: 'Material Symbols Rounded', 'Material Symbols Outlined', 'Material Icons' !important;
+}
+/* Titres en Fraunces ; on n'impose pas la couleur (héritée du thème actif). */
+h1, h2, h3, h4,
+[data-testid="stHeading"] h1, [data-testid="stHeading"] h2, [data-testid="stHeading"] h3 {
+  font-family: "Fraunces", Georgia, serif !important;
+  font-weight: 500; letter-spacing: -.01em;
+}
+h1 { font-size: 2.25rem !important; }
+
+/* Colonne principale : allure de document */
+.block-container { max-width: 1060px; padding-top: 2.6rem; padding-bottom: 4rem; }
+
+/* Épure : masque le bouton Deploy et le liseré, garde le menu ⋮ (Réglages → Thème) */
+[data-testid="stAppDeployButton"], [data-testid="stDecoration"], footer { display: none !important; }
+header[data-testid="stHeader"] { background: transparent; }
+
+/* Barre latérale */
+[data-testid="stSidebar"] { border-right: 1px solid var(--trait); }
+[data-testid="stSidebar"] [role="radiogroup"] { gap: .15rem; }
+
+/* Boutons */
+.stButton > button, [data-testid="stDownloadButton"] > button {
+  border-radius: 8px; font-weight: 600; padding: .55rem 1.15rem; border: 1px solid var(--trait);
+  transition: background .15s ease, border-color .15s ease;
+}
+.stButton > button[kind="primary"]:hover { background: var(--accent-fonce); border-color: var(--accent-fonce); }
+
+/* Indicateurs, façon fiches — fond transparent + bordure : tient sur les deux thèmes. */
+[data-testid="stMetric"] {
+  background: transparent; border: 1px solid var(--trait); border-radius: 10px; padding: .9rem 1.05rem;
+}
+[data-testid="stMetricValue"] { font-family: "IBM Plex Mono", monospace; font-variant-numeric: tabular-nums; }
+[data-testid="stMetricLabel"] p { font-size: .82rem; opacity: .78; }
+
+/* Onglets */
+.stTabs [data-baseweb="tab-list"] { gap: .35rem; border-bottom: 1px solid var(--trait); }
+.stTabs [data-baseweb="tab"] { font-weight: 500; }
+
+/* Tableaux de données : chiffres alignés */
+[data-testid="stDataFrame"] { font-variant-numeric: tabular-nums; }
+
+/* Zones de dépôt de fichiers */
+[data-testid="stFileUploaderDropzone"] { border-radius: 10px; }
+</style>
+"""
+
+
+def _appliquer_style():
+  """Injecte l'habillage épuré de l'application."""
+  st.markdown(_STYLE, unsafe_allow_html=True)
+
 # Valeurs par défaut des tolérances de l'étape 2 (réglables depuis l'interface).
 TOLERANCE_JOURS = 4
 SCORE_MINIMUM = 80
@@ -690,6 +760,16 @@ def _afficher_manuel():
         f" `{_CHEMIN_MANUEL.name}` est bien présent à côté de `app.py`."
     )
     return
+  # Le manuel suit le thème courant de l'application (clair/sombre) pour rester
+  # cohérent ; son bouton « Thème » permet ensuite de basculer manuellement.
+  theme_type = "light"
+  try:
+    theme_type = st.context.theme.type or "light"
+  except Exception:
+    pass
+  manuel = manuel.replace(
+      '<html lang="fr">', f'<html lang="fr" data-theme="{theme_type}">', 1
+  )
   components.html(manuel, height=900, scrolling=True)
 
 
@@ -703,11 +783,11 @@ def _afficher_controles(statut, tableau):
     )
     return
   if statut:
-    with st.expander("✅ Extraction vérifiée sur les totaux du relevé"):
+    with st.expander("Extraction vérifiée sur les totaux du relevé"):
       st.dataframe(tableau, use_container_width=True, hide_index=True)
   else:
     st.error(
-        "⛔ L'extraction ne correspond pas aux totaux imprimés sur le relevé :"
+        "L'extraction ne correspond pas aux totaux imprimés sur le relevé :"
         " des opérations ont été mal lues ou omises. Le rapprochement ci-dessous"
         " n'est pas fiable."
     )
@@ -717,19 +797,22 @@ def _afficher_controles(statut, tableau):
 def _interface():
   """Interface Streamlit."""
   st.set_page_config(
-      page_title="Rapprochement Bancaire Automatique",
-      page_icon="📊",
+      page_title="Rapprochement bancaire",
+      page_icon=":material/account_balance:",
       layout="wide",
   )
+  _appliquer_style()
 
-  _PAGE_RAPP = "🔄 Rapprochement"
-  _PAGE_MANUEL = "📘 Manuel de procédure"
+  _PAGE_RAPP = "Rapprochement"
+  _PAGE_MANUEL = "Manuel de procédure"
   with st.sidebar:
-    page = st.radio("Navigation", (_PAGE_RAPP, _PAGE_MANUEL))
+    st.caption("RAPPROCHEMENT BANCAIRE")
+    page = st.radio("Navigation", (_PAGE_RAPP, _PAGE_MANUEL), label_visibility="collapsed")
+    st.caption("Thème clair ou sombre : selon le réglage de votre système.")
     st.divider()
 
   if page == _PAGE_MANUEL:
-    st.title("📘 Manuel de procédure")
+    st.title("Manuel de procédure")
     st.caption(
         "Guide d'utilisation de l'assistant. Revenez au rapprochement via la"
         " barre latérale."
@@ -737,14 +820,14 @@ def _interface():
     _afficher_manuel()
     return
 
-  st.title("📊 Assistant de Rapprochement Bancaire")
+  st.title("Assistant de rapprochement bancaire")
   st.markdown(
       "Importez votre relevé bancaire au format PDF et votre grand livre"
       " comptable en Excel pour lancer le rapprochement automatique."
   )
 
   with st.sidebar:
-    st.header("⚙️ Paramètres du rapprochement")
+    st.subheader("Paramètres")
     st.caption(
         "Ces réglages ne concernent que le **match partiel** : les opérations de"
         " même montant et même date sont toujours rapprochées."
@@ -786,7 +869,7 @@ def _interface():
     return
 
   if not st.button(
-      "🚀 Lancer le Rapprochement", type="primary", use_container_width=True
+      "Lancer le rapprochement", type="primary", use_container_width=True
   ):
     return
 
@@ -818,7 +901,7 @@ def _interface():
 
       alerte_sens = controler_sens_montants(df_banque, df_compta)
       if alerte_sens:
-        st.warning(f"⚠️ {alerte_sens}")
+        st.warning(alerte_sens)
 
       df_rap, df_mq_compta, df_mq_banque = executer_rapprochement(
           df_banque, df_compta, tolerance_jours, score_minimum
@@ -835,9 +918,9 @@ def _interface():
       )
 
       onglet1, onglet2, onglet3 = st.tabs([
-          f"✅ Rapprochées ({len(df_rap)})",
-          f"🏦 Dans la banque, absentes en compta ({len(df_mq_compta)})",
-          f"📒 En compta, absentes de la banque ({len(df_mq_banque)})",
+          f"Rapprochées ({len(df_rap)})",
+          f"Dans la banque, absentes en compta ({len(df_mq_compta)})",
+          f"En compta, absentes de la banque ({len(df_mq_banque)})",
       ])
       onglet1.dataframe(df_rap, use_container_width=True, hide_index=True)
       onglet2.dataframe(df_mq_compta, use_container_width=True, hide_index=True)
@@ -849,7 +932,7 @@ def _interface():
 
       st.markdown("---")
       st.download_button(
-          label="📥 Télécharger le fichier de résultat Excel",
+          label="Télécharger le résultat (Excel)",
           data=output.getvalue(),
           file_name="resultat_rapprochement.xlsx",
           mime=(
