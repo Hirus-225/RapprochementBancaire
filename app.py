@@ -10,11 +10,16 @@ import re
 import unicodedata
 from collections import Counter
 from datetime import datetime
+from pathlib import Path
 
 import pandas as pd
 import pdfplumber
 import streamlit as st
+import streamlit.components.v1 as components
 from thefuzz import fuzz
+
+# Manuel de procédure embarqué : servi tel quel dans l'onglet dédié de l'app.
+_CHEMIN_MANUEL = Path(__file__).with_name("manuel.html")
 
 # Valeurs par défaut des tolérances de l'étape 2 (réglables depuis l'interface).
 TOLERANCE_JOURS = 4
@@ -675,6 +680,19 @@ def ecrire_resultats(writer, df_rap, df_mq_compta, df_mq_banque, df_controles=No
     df_controles.to_excel(writer, sheet_name="Contrôles extraction", index=False)
 
 
+def _afficher_manuel():
+  """Affiche le manuel de procédure (page HTML autonome) dans l'application."""
+  try:
+    manuel = _CHEMIN_MANUEL.read_text(encoding="utf-8")
+  except OSError:
+    st.error(
+        "Le manuel de procédure est introuvable. Vérifiez que le fichier"
+        f" `{_CHEMIN_MANUEL.name}` est bien présent à côté de `app.py`."
+    )
+    return
+  components.html(manuel, height=900, scrolling=True)
+
+
 def _afficher_controles(statut, tableau):
   """Affiche le recoupement entre l'extraction et les totaux du relevé."""
   if statut is None:
@@ -703,6 +721,21 @@ def _interface():
       page_icon="📊",
       layout="wide",
   )
+
+  _PAGE_RAPP = "🔄 Rapprochement"
+  _PAGE_MANUEL = "📘 Manuel de procédure"
+  with st.sidebar:
+    page = st.radio("Navigation", (_PAGE_RAPP, _PAGE_MANUEL))
+    st.divider()
+
+  if page == _PAGE_MANUEL:
+    st.title("📘 Manuel de procédure")
+    st.caption(
+        "Guide d'utilisation de l'assistant. Revenez au rapprochement via la"
+        " barre latérale."
+    )
+    _afficher_manuel()
+    return
 
   st.title("📊 Assistant de Rapprochement Bancaire")
   st.markdown(
