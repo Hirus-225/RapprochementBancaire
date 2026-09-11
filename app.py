@@ -96,7 +96,9 @@ def _appliquer_style():
 TOLERANCE_JOURS = 4
 SCORE_MINIMUM = 80
 
-_MOTIF_DATE = re.compile(r"^\d{1,2}[/-]\d{1,2}[/-]\d{2,4}$")
+_MOTIF_DATE = re.compile(r"^\d{1,2}[/.-]\d{1,2}[/.-]\d{2,4}$")
+# Numérotation de ligne (« 1. », « 2. »…) précédant la date sur certains relevés.
+_MOTIF_NUMERO_LIGNE = re.compile(r"^\d{1,3}\.$")
 _MOTIF_NOMBRE = re.compile(r"^-?[\d.,]+$")
 _MOTIF_NUMERO_PAGE = re.compile(r"^\d{1,3}\s*/\s*\d{1,3}$")
 # Numéro de chèque : suite de chiffres suivant un marqueur « N° » / « N ».
@@ -105,12 +107,19 @@ _MOTIF_NUMERO_CHEQUE = re.compile(r"\bN\s*°?\s*(\d{3,})")
 # Mots-clés permettant de repérer chaque colonne dans la ligne d'en-tête du PDF.
 _MOTS_ENTETE = {
     "date": ("date", "op."),
-    "libelle": ("libelle", "operation", "operations", "intitule"),
+    "libelle": ("libelle", "operation", "operations", "intitule", "details"),
     "valeur": ("valeur",),
     "debit": ("debit", "debits"),
     "credit": ("credit", "credits"),
     "solde": ("solde",),
 }
+
+# Écart horizontal (en points) au-delà duquel deux mots d'en-tête relèvent de
+# deux colonnes distinctes ; en deçà ils forment un seul intitulé (« Montant
+# Débit »). Sur les trois relevés connus, les mots d'un même intitulé sont
+# séparés de 1,9 à 4,0 points et deux colonnes voisines d'au moins 8,8 : 6 tombe
+# au milieu. À réexaminer si un relevé arrive dans un corps nettement plus gros.
+_ECART_ENTETE = 6
 
 # Lignes de pied de page qui marquent la fin de la zone exploitable.
 _MARQUEURS_FIN = ("sauf erreur", "sauf observation")
@@ -120,6 +129,18 @@ _SOLDE_INITIAL = ("solde precedent", "report a nouveau", "ancien solde")
 _NOMBRE_OPERATIONS = "nombre de transactions"
 _TOTAL_MOUVEMENTS = "total des mouvements"
 _SOLDE_FINAL = "solde au"
+
+# Certains relevés n'impriment pas leurs totaux sur les colonnes Débit/Crédit
+# mais dans un cartouche d'en-tête, sous la forme « libellé : montant ». Le
+# montant est capté en tolérant l'espace ou le point comme séparateur de
+# milliers, sans jamais déborder sur le montant suivant de la même ligne.
+_MONTANT_CARTOUCHE = r"(-?\d{1,3}(?:[\s.,]\d{3})*(?:[.,]\d{1,2})?)"
+_CARTOUCHE = (
+    ("solde_initial", r"ancien solde|solde precedent|report a nouveau"),
+    ("solde_final", r"nouveau solde|solde final"),
+    ("total_credits", r"(?:somme|total) des credits"),
+    ("total_debits", r"(?:somme|total) des debits"),
+)
 
 
 def _normaliser(texte):
@@ -174,36 +195,69 @@ def _lignes_de_mots(page, tolerance=3.0):
   return lignes
 
 
+def _grouper_entete(ligne):
+  """Regroupe les mots contigus de la ligne d'en-tête en intitulés de colonnes."""
+  groupes = []
+  for mot in ligne:
+    if groupes and mot["x0"] - groupes[-1][-1]["x1"] <= _ECART_ENTETE:
+      groupes[-1].append(mot)
+    else:
+      groupes.append([mot])
+  return groupes
+
+
 def _detecter_colonnes(ligne):
   """Repère la ligne d'en-tête et renvoie l'emprise horizontale de chaque colonne.
+
+  Chaque colonne est reconnue sur son intitulé entier — « Montant Débit »,
+  « Date de valeur » — pour que son emprise couvre toute sa largeur : réduite au
+  seul mot-clé, elle démarrerait trop à droite et le montant le plus large
+  tomberait hors de sa propre colonne. Un intitulé qui porte deux mots-clés est
+  arbitré par ordre de spécificité (« Date de valeur » est la colonne Valeur).
 
   Renvoie None si la ligne n'est pas un en-tête : il faut au minimum une colonne
   Débit et une colonne Crédit pour pouvoir situer les montants.
   """
   emprises = {}
-  for mot in ligne:
-    texte = _normaliser(mot["text"])
-    for colonne, mots_cles in _MOTS_ENTETE.items():
-      if texte in mots_cles:
-        x0, x1 = emprises.get(colonne, (mot["x0"], mot["x1"]))
-        emprises[colonne] = (min(x0, mot["x0"]), max(x1, mot["x1"]))
-        break
+  for groupe in _grouper_entete(ligne):
+    mots = [_normaliser(m["text"]) for m in groupe]
+    colonne = next(
+        (
+            c
+            for c in ("debit", "credit", "solde", "valeur", "libelle", "date")
+            if any(m in _MOTS_ENTETE[c] for m in mots)
+        ),
+        None,
+    )
+    if colonne is not None and colonne not in emprises:
+      emprises[colonne] = (groupe[0]["x0"], groupe[-1]["x1"])
 
   if "debit" not in emprises or "credit" not in emprises:
     return None
   return emprises
 
 
+def _ordre_colonnes(emprises):
+  """Colonnes classées de gauche à droite d'après l'en-tête, la date exceptée.
+
+  L'ordre n'est pas le même d'un relevé à l'autre : la colonne Valeur suit le
+  libellé sur les uns et le précède sur les autres. Le déduire des positions
+  évite d'avoir à le figer. La colonne Date en est écartée : elle sert de repère
+  de gauche, jamais à situer un montant.
+  """
+  return sorted(
+      (c for c in emprises if c != "date"), key=lambda c: emprises[c][0]
+  )
+
+
 def _frontieres(emprises):
-  """Frontières verticales entre colonnes numériques, déduites de l'en-tête.
+  """Frontières verticales entre colonnes, déduites de l'en-tête.
 
   La frontière Date/Libellé n'en fait pas partie : ces colonnes sont alignées à
-  gauche alors que leur titre est centré. La date est identifiée autrement, comme
-  premier mot de la ligne quand il ressemble à une date.
+  gauche alors que leur titre est centré. La date est identifiée autrement, par
+  son allure en tête de la zone de gauche.
   """
-  ordre = [
-      c for c in ("libelle", "valeur", "debit", "credit", "solde") if c in emprises
-  ]
+  ordre = _ordre_colonnes(emprises)
   return {
       (gauche, droite): (emprises[gauche][1] + emprises[droite][0]) / 2
       for gauche, droite in zip(ordre, ordre[1:])
@@ -213,13 +267,85 @@ def _frontieres(emprises):
 def _colonne_du_mot(mot, emprises, frontieres):
   """Attribue un mot à une colonne numérique d'après sa position horizontale."""
   centre = (mot["x0"] + mot["x1"]) / 2
-  ordre = [
-      c for c in ("libelle", "valeur", "debit", "credit", "solde") if c in emprises
-  ]
+  ordre = _ordre_colonnes(emprises)
   for gauche, droite in zip(ordre, ordre[1:]):
     if centre < frontieres[(gauche, droite)]:
       return gauche
   return ordre[-1]
+
+
+def _limite_zone_gauche(emprises):
+  """Abscisse séparant la zone « date + libellé » des colonnes numériques.
+
+  La coupure se fait au bord gauche de la colonne qui suit le libellé, et non à
+  mi-chemin : un libellé long déborde volontiers vers les colonnes voisines, et
+  le point milieu ferait basculer sa fin du côté des montants, où elle se
+  collerait au montant sans rien lever comme erreur.
+  """
+  ordre = _ordre_colonnes(emprises)
+  if "libelle" in ordre:
+    rang = ordre.index("libelle")
+    if rang + 1 < len(ordre):
+      return emprises[ordre[rang + 1]][0]
+  # En-tête sans intitulé de libellé reconnu : la première colonne numérique
+  # sert de repère, elle est toujours présente (`_detecter_colonnes`).
+  return min(emprises["debit"][0], emprises["credit"][0])
+
+
+def _valeur_avant_libelle(emprises):
+  """Vrai si la colonne Valeur précède le libellé, donc reste en zone gauche."""
+  if "valeur" not in emprises or "libelle" not in emprises:
+    return False
+  return emprises["valeur"][0] < emprises["libelle"][0]
+
+
+def _detacher_date(mots, valeur_a_gauche):
+  """Isole la date d'opération en tête de la zone de gauche.
+
+  La date n'est pas toujours le premier mot : certains relevés numérotent leurs
+  lignes (« 1. », « 2. »…) et impriment la date de valeur juste après la date
+  d'opération, avant le libellé. Renvoie `(date, mots restants)`, la date valant
+  None quand la ligne n'en ouvre pas une nouvelle (suite de libellé).
+  """
+  restants = mots
+  if (
+      len(restants) >= 2
+      and _MOTIF_NUMERO_LIGNE.match(restants[0]["text"].strip())
+      and _MOTIF_DATE.match(restants[1]["text"].strip())
+  ):
+    restants = restants[1:]
+
+  if not restants or not _MOTIF_DATE.match(restants[0]["text"].strip()):
+    return None, mots
+
+  date_operation = restants[0]["text"].strip()
+  restants = restants[1:]
+  # Colonne Valeur placée avant le libellé : la seconde date est la date de
+  # valeur, elle n'appartient pas au libellé.
+  if (
+      valeur_a_gauche
+      and restants
+      and _MOTIF_DATE.match(restants[0]["text"].strip())
+  ):
+    restants = restants[1:]
+  return date_operation, restants
+
+
+def _lire_cartouche(texte, controles):
+  """Capte les totaux de contrôle écrits « libellé : montant » en tête de relevé.
+
+  Complète `_lire_ligne_de_synthese`, qui lit les totaux imprimés en pied sur les
+  colonnes Débit/Crédit. Sans ce second chemin, un relevé qui annonce pourtant
+  ses totaux resterait invérifiable.
+  """
+  for cle, motif in _CARTOUCHE:
+    if cle in controles:
+      continue
+    trouve = re.search(f"(?:{motif})" + r"\s*:?\s*" + _MONTANT_CARTOUCHE, texte)
+    if trouve:
+      montant = _en_nombre(trouve.group(1))
+      if montant is not None:
+        controles[cle] = montant
 
 
 def _lire_ligne_de_synthese(texte_gauche, colonnes, controles):
@@ -252,6 +378,7 @@ def _extraire_par_coordonnees(pdf):
   controles = {}
   emprises = None
   frontieres = None
+  valeur_a_gauche = False
 
   for page in pdf.pages:
     courante = None
@@ -261,10 +388,13 @@ def _extraire_par_coordonnees(pdf):
       entete = _detecter_colonnes(ligne)
       if entete:
         emprises, frontieres = entete, _frontieres(entete)
+        valeur_a_gauche = _valeur_avant_libelle(entete)
         courante = None
         continue
 
       if emprises is None:
+        # Avant l'en-tête : seul le cartouche de totaux nous intéresse.
+        _lire_cartouche(texte_ligne, controles)
         continue
 
       # Pied de page : on arrête la lecture de la page en cours.
@@ -273,17 +403,12 @@ def _extraire_par_coordonnees(pdf):
       if _MOTIF_NUMERO_PAGE.match(texte_ligne):
         continue
 
-      limite_gauche = frontieres[
-          ("libelle", "valeur" if "valeur" in emprises else "debit")
-      ]
+      limite_gauche = _limite_zone_gauche(emprises)
       mots_gauche = [m for m in ligne if (m["x0"] + m["x1"]) / 2 < limite_gauche]
       mots_droite = [m for m in ligne if (m["x0"] + m["x1"]) / 2 >= limite_gauche]
 
-      # Une nouvelle opération commence par une date dans la colonne de gauche.
-      date_operation = None
-      if mots_gauche and _MOTIF_DATE.match(mots_gauche[0]["text"].strip()):
-        date_operation = mots_gauche[0]["text"].strip()
-        mots_gauche = mots_gauche[1:]
+      # Une nouvelle opération s'ouvre sur une date dans la zone de gauche.
+      date_operation, mots_gauche = _detacher_date(mots_gauche, valeur_a_gauche)
 
       colonnes = {"valeur": [], "debit": [], "credit": [], "solde": []}
       droite_non_numerique = False
