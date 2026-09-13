@@ -21,74 +21,220 @@ from thefuzz import fuzz
 # Manuel de procédure embarqué : servi tel quel dans l'onglet dédié de l'app.
 _CHEMIN_MANUEL = Path(__file__).with_name("manuel.html")
 
-# Habillage épuré, cohérent avec le manuel (typographies Fraunces + IBM Plex,
-# palette « grand livre »). Les couleurs de fond/texte viennent de config.toml ;
-# cette feuille ne fait que la typographie, l'espacement et le style des blocs.
+# ---------------------------------------------------------------------------
+# Design system « Assistant de rapprochement » — volet CSS.
+#
+# Les jetons ci-dessous sont ceux du kit ; ils sont repris à l'identique dans
+# `.streamlit/config.toml` (ce que Streamlit peint lui-même : widgets,
+# dataframes, alertes, rayons, typographie) et dans `manuel.html`. Toute
+# retouche de palette doit passer par les trois fichiers.
+#
+# Cette feuille ne fait que ce que le thème Streamlit ne sait pas exprimer :
+# les composants du kit (navigation, boutons, zones de dépôt, onglets,
+# indicateurs) et les chiffres en tabulaire.
+# ---------------------------------------------------------------------------
 _STYLE = """
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap');
 
-/* Bordure translucide et accent de l'habillage. */
-:root { --trait: rgba(130,142,133,.30); --accent-fonce: #0A5A49; }
+/* ── Jetons du kit ───────────────────────────────────────────────────── */
+:root {
+  --font-display: "Fraunces", Georgia, "Times New Roman", serif;
+  --font-sans: "IBM Plex Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  --text-xs: 12px; --text-sm: 14px; --text-base: 16px; --text-lg: 18px;
+  --text-xl: 22px; --text-2xl: 28px; --text-3xl: 36px;
 
+  --bg: #FFFFFF; --surface: #F0F2F6; --surface-2: #F7F8FB;
+  --border: #E1E5EC; --border-strong: #C7CDD9;
+  --text: #31333F; --text-muted: #6B6E7D; --text-faint: #9B9EAC;
+  --accent: #0E7A63; --accent-strong: #0A5D4B; --accent-soft: #E2F0EC;
+  --accent-contrast: #FFFFFF;
+
+  --info: #0054A3;    --info-bg: #E9F2FD;    --info-border: #C3DCF7;
+  --success: #177233; --success-bg: #E7F5EB; --success-border: #BFE3C9;
+  --warning: #8A6400; --warning-bg: #FBF3D8; --warning-border: #EBDCA4;
+  --danger: #A1373E;  --danger-bg: #FBEBEC;  --danger-border: #EFC9CC;
+
+  --sp-1: 4px; --sp-2: 8px; --sp-3: 12px; --sp-4: 16px;
+  --sp-5: 24px; --sp-6: 32px; --sp-7: 48px; --sp-8: 64px;
+
+  --r-sm: 4px; --r-md: 8px; --r-lg: 10px; --r-xl: 16px; --r-full: 999px;
+  --shadow-sm: 0 1px 2px rgba(49,51,63,.06);
+  --shadow-md: 0 2px 8px rgba(49,51,63,.08);
+  --shadow-lg: 0 12px 32px rgba(49,51,63,.12);
+  --ring: 0 0 0 3px rgba(14,122,99,.25);
+  --ease: cubic-bezier(.2,.7,.3,1);
+}
+
+/* ── Fondations ──────────────────────────────────────────────────────── */
 html, body, .stApp, [data-testid="stAppViewContainer"],
 [data-testid="stMarkdownContainer"], [data-testid="stWidgetLabel"],
 .stButton, .stRadio, .stMetric, .stTabs {
-  font-family: "IBM Plex Sans", system-ui, -apple-system, sans-serif;
+  font-family: var(--font-sans);
 }
 /* Ne jamais toucher aux icônes Material de Streamlit (sinon ligatures en clair). */
 [data-testid="stIconMaterial"], .material-icons, .material-icons-outlined,
 .material-symbols-rounded, .material-symbols-outlined {
   font-family: 'Material Symbols Rounded', 'Material Symbols Outlined', 'Material Icons' !important;
 }
-/* Titres en Fraunces ; la couleur vient du thème clair de config.toml. */
-h1, h2, h3, h4,
-[data-testid="stHeading"] h1, [data-testid="stHeading"] h2, [data-testid="stHeading"] h3 {
-  font-family: "Fraunces", Georgia, serif !important;
-  font-weight: 500; letter-spacing: -.01em;
+/* Titres : familles et tailles viennent du thème ; reste l'équilibrage. */
+h1, h2, h3, h4 { text-wrap: balance; }
+h1 { line-height: 1.2; letter-spacing: -.01em; }
+h2 { line-height: 1.25; letter-spacing: -.01em; }
+h3 { line-height: 1.3; }
+a { text-underline-offset: 3px; }
+a:hover { color: var(--accent-strong); }
+:focus-visible { outline: none; box-shadow: var(--ring); border-radius: var(--r-sm); }
+hr, [data-testid="stDivider"] { border: 0; border-top: 1px solid var(--border); }
+@media (prefers-reduced-motion: reduce) {
+  * { transition: none !important; animation: none !important; }
 }
-h1 { font-size: 2.25rem !important; }
 
 /* Colonne principale : allure de document */
-.block-container { max-width: 1060px; padding-top: 2.6rem; padding-bottom: 4rem; }
+.block-container { max-width: 1060px; padding-top: var(--sp-6); padding-bottom: var(--sp-8); }
 
 /* Épure : masque le bouton Deploy et le liseré, garde le menu ⋮ */
 [data-testid="stAppDeployButton"], [data-testid="stDecoration"], footer { display: none !important; }
 header[data-testid="stHeader"] { background: transparent; }
 
-/* Barre latérale */
-[data-testid="stSidebar"] { border-right: 1px solid var(--trait); }
-[data-testid="stSidebar"] [role="radiogroup"] { gap: .15rem; }
-
-/* Boutons */
-.stButton > button, [data-testid="stDownloadButton"] > button {
-  border-radius: 8px; font-weight: 600; padding: .55rem 1.15rem; border: 1px solid var(--trait);
-  transition: background .15s ease, border-color .15s ease;
+/* ── Barre latérale : la navigation du kit (.nav) ────────────────────── */
+/* Titres de groupe (.nav-title) : mono, capitales, discret. */
+[data-testid="stSidebar"] h3 {
+  font-family: var(--font-mono) !important;
+  font-size: 11px !important; font-weight: 400 !important;
+  letter-spacing: .12em; text-transform: uppercase; color: var(--text-muted);
 }
-.stButton > button[kind="primary"]:hover { background: var(--accent-fonce); border-color: var(--accent-fonce); }
+[data-testid="stSidebar"] [data-testid="stRadioGroup"] { gap: var(--sp-1); }
+/* Une navigation n'affiche pas de rond de bouton radio. */
+[data-testid="stSidebar"] [data-testid="stRadioOption"] > div > div > div:first-child:not([data-testid]) {
+  display: none;
+}
+[data-testid="stSidebar"] [data-testid="stRadioOption"] {
+  padding: 7px var(--sp-3); border-radius: var(--r-md);
+  transition: background .15s var(--ease);
+}
+[data-testid="stSidebar"] [data-testid="stRadioOption"] p {
+  font-size: var(--text-sm); color: var(--text-muted);
+}
+[data-testid="stSidebar"] [data-testid="stRadioOption"]:hover { background: var(--bg); }
+[data-testid="stSidebar"] [data-testid="stRadioOption"]:hover p { color: var(--text); }
+[data-testid="stSidebar"] [data-testid="stRadioOption"][data-selected="true"] { background: var(--accent-soft); }
+[data-testid="stSidebar"] [data-testid="stRadioOption"][data-selected="true"] p {
+  color: var(--accent); font-weight: 500;
+}
+/* En-tête de la barre latérale : .eyebrow + nom du produit en Fraunces. */
+.ds-eyebrow {
+  font-family: var(--font-mono); font-size: var(--text-xs);
+  letter-spacing: .14em; text-transform: uppercase; color: var(--accent);
+}
 
-/* Indicateurs, façon fiches — fond transparent + bordure fine. */
+/* ── Boutons (.btn) ──────────────────────────────────────────────────── */
+[data-testid="stBaseButton-secondary"], [data-testid="stBaseButton-primary"] {
+  font-family: var(--font-sans); font-size: var(--text-sm); font-weight: 500;
+  line-height: 1; padding: 10px var(--sp-4); border: 1px solid transparent;
+  transition: background .15s var(--ease), border-color .15s var(--ease),
+              color .15s var(--ease), transform .06s var(--ease);
+}
+[data-testid="stBaseButton-secondary"] { background: var(--surface); color: var(--text); }
+[data-testid="stBaseButton-secondary"]:hover {
+  background: var(--border); color: var(--text); border-color: transparent;
+}
+[data-testid="stBaseButton-primary"] { background: var(--accent); color: var(--accent-contrast); }
+[data-testid="stBaseButton-primary"]:hover {
+  background: var(--accent-strong); color: var(--accent-contrast); border-color: transparent;
+}
+[data-testid="stBaseButton-secondary"]:active,
+[data-testid="stBaseButton-primary"]:active { transform: translateY(1px); }
+/* Le téléchargement du résultat est l'action secondaire encadrée (.btn--secondary). */
+[data-testid="stDownloadButton"] [data-testid="stBaseButton-secondary"] {
+  background: var(--bg); border-color: var(--border-strong);
+}
+[data-testid="stDownloadButton"] [data-testid="stBaseButton-secondary"]:hover {
+  background: var(--accent-soft); border-color: var(--accent); color: var(--accent);
+}
+
+/* ── Zones de dépôt (.dropzone) ──────────────────────────────────────── */
+[data-testid="stFileUploaderDropzone"] {
+  background: var(--surface); border: 1px dashed var(--border-strong);
+  border-radius: var(--r-lg); padding: var(--sp-4);
+  transition: border-color .15s var(--ease), background .15s var(--ease);
+}
+[data-testid="stFileUploaderDropzone"]:hover {
+  border-color: var(--accent); background: var(--accent-soft);
+}
+[data-testid="stFileUploaderDropzone"] small { color: var(--text-muted); font-size: var(--text-xs); }
+/* Fichier chargé : la pastille du kit (.file-pill). */
+[data-testid="stFileUploaderFile"] {
+  background: var(--accent-soft); border-radius: var(--r-md); padding: 6px var(--sp-3);
+}
+[data-testid="stFileUploaderFile"] [data-testid="stFileUploaderFileName"] {
+  font-family: var(--font-mono); font-size: var(--text-xs); color: var(--accent);
+}
+
+/* ── Messages (.alert) ───────────────────────────────────────────────── */
+/* Fond et texte viennent des palettes du thème (config.toml) ; le kit ajoute
+   un filet de la même famille, que Streamlit n'expose pas en réglage. */
+[data-testid="stAlertContainer"] { border: 1px solid transparent; }
+[data-testid="stAlertContainer"]:has([data-testid="stAlertContentInfo"]) { border-color: var(--info-border); }
+[data-testid="stAlertContainer"]:has([data-testid="stAlertContentSuccess"]) { border-color: var(--success-border); }
+[data-testid="stAlertContainer"]:has([data-testid="stAlertContentWarning"]) { border-color: var(--warning-border); }
+[data-testid="stAlertContainer"]:has([data-testid="stAlertContentError"]) { border-color: var(--danger-border); }
+
+/* ── Indicateurs (.metric) ───────────────────────────────────────────── */
 [data-testid="stMetric"] {
-  background: transparent; border: 1px solid var(--trait); border-radius: 10px; padding: .9rem 1.05rem;
+  background: var(--surface); border: 0; border-radius: var(--r-lg); padding: var(--sp-4);
 }
-[data-testid="stMetricValue"] { font-family: "IBM Plex Mono", monospace; font-variant-numeric: tabular-nums; }
-[data-testid="stMetricLabel"] p { font-size: .82rem; opacity: .78; }
+[data-testid="stMetricLabel"] p {
+  font-size: var(--text-xs); color: var(--text-muted);
+  text-transform: uppercase; letter-spacing: .06em;
+}
+[data-testid="stMetricValue"] {
+  font-family: var(--font-display); font-variant-numeric: tabular-nums; line-height: 1.15;
+}
+[data-testid="stMetricDelta"] { font-family: var(--font-mono); font-size: var(--text-xs); }
 
-/* Onglets */
-.stTabs [data-baseweb="tab-list"] { gap: .35rem; border-bottom: 1px solid var(--trait); }
-.stTabs [data-baseweb="tab"] { font-weight: 500; }
+/* ── Onglets (.tabs) ─────────────────────────────────────────────────── */
+/* Streamlit rend ses onglets avec react-aria : `[data-testid="stTab"]` et
+   `.react-aria-SelectionIndicator` pour le trait de l'onglet actif. */
+[data-testid="stTabs"] [role="tablist"] { gap: var(--sp-1); border-bottom: 1px solid var(--border); }
+[data-testid="stTab"] {
+  padding: 9px var(--sp-4); transition: color .15s var(--ease);
+}
+[data-testid="stTab"] p {
+  font-family: var(--font-sans); font-size: var(--text-sm);
+  font-weight: 400; color: var(--text-muted);
+}
+[data-testid="stTab"]:hover p { color: var(--text); }
+[data-testid="stTab"][aria-selected="true"] p { color: var(--accent); font-weight: 500; }
+[data-testid="stTabs"] .react-aria-SelectionIndicator { background-color: var(--accent); }
 
-/* Tableaux de données : chiffres alignés */
-[data-testid="stDataFrame"] { font-variant-numeric: tabular-nums; }
+/* ── Tableaux (.table-wrap) et chiffres ──────────────────────────────── */
+[data-testid="stDataFrame"] { border-radius: var(--r-lg); font-variant-numeric: tabular-nums; }
 
-/* Zones de dépôt de fichiers */
-[data-testid="stFileUploaderDropzone"] { border-radius: 10px; }
+/* ── Volet dépliant (.card) ──────────────────────────────────────────── */
+[data-testid="stExpander"] details {
+  background: var(--bg); border: 1px solid var(--border); border-radius: var(--r-lg);
+}
+[data-testid="stExpander"] summary { font-size: var(--text-sm); font-weight: 500; }
+
+/* ── Curseurs (.slider) : la valeur et les bornes sont en mono ───────── */
+[data-testid="stSliderThumbValue"] {
+  font-family: var(--font-mono); font-size: var(--text-sm);
+  font-weight: 500; color: var(--accent);
+}
+[data-testid="stSliderTickBar"] {
+  font-family: var(--font-mono); font-size: var(--text-xs); color: var(--text-faint);
+}
+
+/* ── Légendes (.hint) ────────────────────────────────────────────────── */
+[data-testid="stCaptionContainer"] { font-size: var(--text-xs); color: var(--text-muted); }
 </style>
 """
 
 
 def _appliquer_style():
-  """Injecte l'habillage épuré de l'application."""
+  """Injecte les jetons et les composants du design system."""
   st.markdown(_STYLE, unsafe_allow_html=True)
 
 
@@ -886,8 +1032,10 @@ def _afficher_manuel():
         f" `{_CHEMIN_MANUEL.name}` est bien présent à côté de `app.py`."
     )
     return
-  # L'application est en thème clair : on force le manuel en clair pour rester
-  # cohérent (il est théma-conscient et suivrait sinon le système).
+  # La palette sombre du kit ne s'active que sur `data-theme="dark"` : le
+  # manuel est donc déjà clair par défaut. On pose quand même l'attribut pour
+  # que la page reste alignée sur l'application si elle gagnait un jour un
+  # amorçage de thème.
   manuel = manuel.replace(
       '<html lang="fr">', '<html lang="fr" data-theme="light">', 1
   )
@@ -927,7 +1075,11 @@ def _interface():
   _PAGE_RAPP = "Rapprochement"
   _PAGE_MANUEL = "Manuel de procédure"
   with st.sidebar:
-    st.caption("RAPPROCHEMENT BANCAIRE")
+    # Surtitre du kit (.eyebrow) : mono, capitales, accent.
+    st.markdown(
+        '<div class="ds-eyebrow">Rapprochement bancaire</div>',
+        unsafe_allow_html=True,
+    )
     page = st.radio("Navigation", (_PAGE_RAPP, _PAGE_MANUEL), label_visibility="collapsed")
     st.divider()
 

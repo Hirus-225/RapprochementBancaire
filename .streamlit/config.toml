@@ -1,6 +1,69 @@
-[theme]
+# ---------------------------------------------------------------------------
+# Design system « Assistant de rapprochement » — volet Streamlit.
+#
+# Ce fichier porte les jetons que Streamlit consomme lui-même : widgets,
+# dataframes (rendus en canvas, hors de portée du CSS), alertes, rayons et
+# typographie. Les MÊMES valeurs sont déclarées en variables CSS dans `_STYLE`
+# (app.py) et dans `manuel.html` ; les trois fichiers doivent rester
+# synchronisés — le nom du jeton du kit figure en commentaire de chaque ligne.
+#
 # Thème clair imposé : l'application n'a qu'un seul rendu, y compris pour les
-# utilisateurs dont le système est en sombre.
+# utilisateurs dont le système est en sombre. Le kit décrit bien une palette
+# sombre, mais il ne l'active que si `data-theme="dark"` est posé sur <html> :
+# faute d'amorçage, elle reste dormante — c'est le choix de produit.
+# ---------------------------------------------------------------------------
+[theme]
 base = "light"
-primaryColor = "#0E7A63"
-font = "sans serif"
+
+# Surfaces et texte
+backgroundColor = "#FFFFFF"                  # --bg
+secondaryBackgroundColor = "#F0F2F6"         # --surface
+textColor = "#31333F"                        # --text
+borderColor = "#E1E5EC"                      # --border
+showWidgetBorder = false                     # .input : fond plein, bord transparent
+showSidebarBorder = true
+
+# Accent
+primaryColor = "#0E7A63"                     # --accent
+linkColor = "#0E7A63"                        # --accent
+
+# Typographie
+font = "\"IBM Plex Sans\", -apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif"
+headingFont = "\"Fraunces\", Georgia, \"Times New Roman\", serif"
+codeFont = "\"IBM Plex Mono\", ui-monospace, SFMono-Regular, Menlo, monospace"
+baseFontSize = 16                            # --text-base
+headingFontSizes = ["36px", "28px", "18px", "16px", "14px", "12px"]  # --text-3xl/2xl/lg/base/sm/xs
+headingFontWeights = [500, 500, 500, 500, 500, 500]
+
+# Rayons
+baseRadius = "10px"                          # --r-lg
+buttonRadius = "8px"                         # --r-md
+
+# Indicateurs (.metric du kit : valeur en Fraunces 28 px / 500)
+metricValueFontSize = "28px"                 # --text-2xl
+metricValueFontWeight = 500
+
+# Tableaux (.table-wrap + table.data th)
+dataframeBorderColor = "#E1E5EC"             # --border
+dataframeHeaderBackgroundColor = "#F0F2F6"   # --surface
+
+# Palettes sémantiques du kit, utilisées par st.info / st.success /
+# st.warning / st.error et par les badges.
+blueColor = "#0054A3"                        # --info
+blueTextColor = "#0054A3"                    # --info
+blueBackgroundColor = "#E9F2FD"              # --info-bg
+greenColor = "#177233"                       # --success
+greenTextColor = "#177233"                   # --success
+greenBackgroundColor = "#E7F5EB"             # --success-bg
+yellowColor = "#8A6400"                      # --warning
+yellowTextColor = "#8A6400"                  # --warning
+yellowBackgroundColor = "#FBF3D8"            # --warning-bg
+orangeColor = "#8A6400"                      # --warning
+orangeTextColor = "#8A6400"                  # --warning
+orangeBackgroundColor = "#FBF3D8"            # --warning-bg
+redColor = "#A1373E"                         # --danger
+redTextColor = "#A1373E"                     # --danger
+redBackgroundColor = "#FBEBEC"               # --danger-bg
+grayColor = "#6B6E7D"                        # --text-muted
+grayTextColor = "#6B6E7D"                    # --text-muted
+grayBackgroundColor = "#F0F2F6"              # --surface
