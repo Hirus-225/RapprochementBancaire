@@ -15,19 +15,21 @@ from pathlib import Path
 import pandas as pd
 import pdfplumber
 import streamlit as st
-import streamlit.components.v1 as components
 from thefuzz import fuzz
 
-# Manuel de procédure embarqué : servi tel quel dans l'onglet dédié de l'app.
-_CHEMIN_MANUEL = Path(__file__).with_name("manuel.html")
+# Manuel de procédure : `docs/MANUEL-PROCEDURE.md` est la seule source. Il est
+# lu depuis le disque et rendu tel quel dans l'onglet dédié — recopier son texte
+# dans une constante Python créerait deux versions du même document, qui
+# divergeraient à la première correction.
+_CHEMIN_MANUEL = Path(__file__).parent / "docs" / "MANUEL-PROCEDURE.md"
 
 # ---------------------------------------------------------------------------
 # Design system « Assistant de rapprochement » — volet CSS.
 #
 # Les jetons ci-dessous sont ceux du kit ; ils sont repris à l'identique dans
 # `.streamlit/config.toml` (ce que Streamlit peint lui-même : widgets,
-# dataframes, alertes, rayons, typographie) et dans `manuel.html`. Toute
-# retouche de palette doit passer par les trois fichiers.
+# dataframes, alertes, rayons, typographie). Toute retouche de palette doit
+# passer par les deux fichiers.
 #
 # Cette feuille ne fait que ce que le thème Streamlit ne sait pas exprimer :
 # les composants du kit (navigation, boutons, zones de dépôt, onglets,
@@ -180,6 +182,20 @@ header[data-testid="stHeader"] { background: transparent; }
 [data-testid="stAlertContainer"]:has([data-testid="stAlertContentSuccess"]) { border-color: var(--success-border); }
 [data-testid="stAlertContainer"]:has([data-testid="stAlertContentWarning"]) { border-color: var(--warning-border); }
 [data-testid="stAlertContainer"]:has([data-testid="stAlertContentError"]) { border-color: var(--danger-border); }
+
+/* ── Encadrés du manuel (.callout) ───────────────────────────────────── */
+/* Le manuel est du Markdown rendu par `st.markdown` : ses `>` portent les
+   encadrés « À retenir » / « Attention » du kit. Sans cette règle, Streamlit
+   les rend en simple texte grisé, indiscernable du paragraphe voisin. */
+[data-testid="stMarkdownContainer"] blockquote {
+  background: var(--surface-2);
+  border-left: 3px solid var(--accent);
+  border-radius: 0 var(--r-md) var(--r-md) 0;
+  padding: var(--sp-3) var(--sp-4);
+  margin: var(--sp-4) 0;
+  color: var(--text);
+}
+[data-testid="stMarkdownContainer"] blockquote p:last-child { margin-bottom: 0; }
 
 /* ── Indicateurs (.metric) ───────────────────────────────────────────── */
 [data-testid="stMetric"] {
@@ -1023,23 +1039,21 @@ def ecrire_resultats(writer, df_rap, df_mq_compta, df_mq_banque, df_controles=No
 
 
 def _afficher_manuel():
-  """Affiche le manuel de procédure (page HTML autonome) dans l'application."""
+  """Rend `docs/MANUEL-PROCEDURE.md` tel quel dans l'application.
+
+  `st.markdown` affiche les titres, tableaux, citations et blocs de code du
+  fichier : le manuel hérite ainsi du thème de l'application, sans HTML à
+  maintenir en parallèle.
+  """
   try:
     manuel = _CHEMIN_MANUEL.read_text(encoding="utf-8")
   except OSError:
     st.error(
         "Le manuel de procédure est introuvable. Vérifiez que le fichier"
-        f" `{_CHEMIN_MANUEL.name}` est bien présent à côté de `app.py`."
+        " `docs/MANUEL-PROCEDURE.md` est bien livré avec `app.py`."
     )
     return
-  # La palette sombre du kit ne s'active que sur `data-theme="dark"` : le
-  # manuel est donc déjà clair par défaut. On pose quand même l'attribut pour
-  # que la page reste alignée sur l'application si elle gagnait un jour un
-  # amorçage de thème.
-  manuel = manuel.replace(
-      '<html lang="fr">', '<html lang="fr" data-theme="light">', 1
-  )
-  components.html(manuel, height=900, scrolling=True)
+  st.markdown(manuel)
 
 
 def _afficher_controles(statut, tableau):
@@ -1082,13 +1096,14 @@ def _interface():
     )
     page = st.radio("Navigation", (_PAGE_RAPP, _PAGE_MANUEL), label_visibility="collapsed")
     st.divider()
+    if page == _PAGE_MANUEL:
+      st.caption(
+          "Le mode d'emploi. Revenez au rapprochement par la barre latérale."
+      )
 
   if page == _PAGE_MANUEL:
-    st.title("Manuel de procédure")
-    st.caption(
-        "Guide d'utilisation de l'assistant. Revenez au rapprochement via la"
-        " barre latérale."
-    )
+    # Le manuel porte son propre titre : pas de `st.title` ici, qui le
+    # doublerait.
     _afficher_manuel()
     return
 

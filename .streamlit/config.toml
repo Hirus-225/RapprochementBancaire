@@ -4,8 +4,8 @@
 # Ce fichier porte les jetons que Streamlit consomme lui-même : widgets,
 # dataframes (rendus en canvas, hors de portée du CSS), alertes, rayons et
 # typographie. Les MÊMES valeurs sont déclarées en variables CSS dans `_STYLE`
-# (app.py) et dans `manuel.html` ; les trois fichiers doivent rester
-# synchronisés — le nom du jeton du kit figure en commentaire de chaque ligne.
+# (app.py) ; les deux fichiers doivent rester synchronisés — le nom du jeton du
+# kit figure en commentaire de chaque ligne.
 #
 # Thème clair imposé : l'application n'a qu'un seul rendu, y compris pour les
 # utilisateurs dont le système est en sombre. Le kit décrit bien une palette
