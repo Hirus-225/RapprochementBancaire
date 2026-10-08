@@ -78,9 +78,10 @@ ligne, et d'encaisser les montants dont l'espace sépare les milliers
 parseur **par tableaux**, qui repère les colonnes Débit/Crédit sur la ligne
 d'en-tête de chaque page.
 
-Trois formats de relevé sont couverts à ce jour, dont les relevés SIB et ceux
-de la Société Générale CI (dates pointées, lignes numérotées, totaux en
-cartouche d'en-tête).
+Quatre formats de relevé sont couverts à ce jour : les relevés SIB, ceux de la
+Société Générale CI (dates pointées, lignes numérotées, totaux en cartouche
+d'en-tête) et ceux d'Ecobank (en-tête en anglais, dates `30-Jan-2026`, devise
+accolée aux montants, colonne de référence entre le libellé et les montants).
 
 ## Vérification après modification du parseur
 

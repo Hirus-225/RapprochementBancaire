@@ -258,29 +258,44 @@ def _appliquer_style():
 TOLERANCE_JOURS = 4
 SCORE_MINIMUM = 80
 
-_MOTIF_DATE = re.compile(r"^\d{1,2}[/.-]\d{1,2}[/.-]\d{2,4}$")
+# Le mois est chiffré (« 30/01/2026 ») ou abrégé en lettres (« 30-Jan-2026 »).
+_MOTIF_DATE = re.compile(r"^\d{1,2}[/.-](?:\d{1,2}|[A-Za-z]{3,9})[/.-]\d{2,4}$")
 # Numérotation de ligne (« 1. », « 2. »…) précédant la date sur certains relevés.
 _MOTIF_NUMERO_LIGNE = re.compile(r"^\d{1,3}\.$")
 _MOTIF_NOMBRE = re.compile(r"^-?[\d.,]+$")
 _MOTIF_NUMERO_PAGE = re.compile(r"^\d{1,3}\s*/\s*\d{1,3}$")
-# Numéro de chèque : suite de chiffres suivant un marqueur « N° » / « N ».
-_MOTIF_NUMERO_CHEQUE = re.compile(r"\bN\s*°?\s*(\d{3,})")
+# Pied de page « n° de page + date et heure d'édition » (« 1 09 Feb 2026, 10:23 »).
+_MOTIF_PIED_HORODATE = re.compile(
+    r"^\d{1,3}\s+\d{1,2}[\s/.-][a-z0-9]{2,9}[\s/.-]\d{2,4},?\s+\d{1,2}:\d{2}$"
+)
+# Devise accolée au montant (« XOF6,000.00 ») : retirée avant lecture du nombre.
+_MOTIF_DEVISE = re.compile(r"^(?:XOF|F\.?CFA|CFA|EUR|USD)", re.IGNORECASE)
+# Numéro de chèque : suite de chiffres suivant un marqueur « N° » / « N ». Le
+# « N » se trouve parfois soudé au mot qui le précède (« CHEQUEN 3521911 »).
+_MOTIF_NUMERO_CHEQUE = re.compile(r"(?:\bN|\bCHEQUEN)\s*°?\s*(\d{3,})")
 
 # Mots-clés permettant de repérer chaque colonne dans la ligne d'en-tête du PDF.
 _MOTS_ENTETE = {
     "date": ("date", "op."),
-    "libelle": ("libelle", "operation", "operations", "intitule", "details"),
-    "valeur": ("valeur",),
-    "debit": ("debit", "debits"),
-    "credit": ("credit", "credits"),
-    "solde": ("solde",),
+    "libelle": (
+        "libelle", "operation", "operations", "intitule", "details",
+        "description",
+    ),
+    "reference": ("reference",),
+    "valeur": ("valeur", "value"),
+    "debit": ("debit", "debits", "payments", "withdrawals"),
+    "credit": ("credit", "credits", "deposits"),
+    "solde": ("solde", "balance"),
 }
 
 # Écart horizontal (en points) au-delà duquel deux mots d'en-tête relèvent de
 # deux colonnes distinctes ; en deçà ils forment un seul intitulé (« Montant
-# Débit »). Sur les trois relevés connus, les mots d'un même intitulé sont
-# séparés de 1,9 à 4,0 points et deux colonnes voisines d'au moins 8,8 : 6 tombe
-# au milieu. À réexaminer si un relevé arrive dans un corps nettement plus gros.
+# Débit »). Sur les relevés connus, les mots d'un même intitulé sont séparés de
+# 1,9 à 4,0 points et deux colonnes voisines d'au moins 8,8 : 6 tombe au milieu.
+# Seule exception, le relevé Ecobank ne laisse que 7,4 points entre « Transaction
+# Date » et « Description » — sans conséquence si les deux fusionnaient, la
+# colonne Date ne servant jamais à situer un mot. À réexaminer si un relevé
+# arrive dans un corps nettement plus gros.
 _ECART_ENTETE = 6
 
 # Lignes de pied de page qui marquent la fin de la zone exploitable.
@@ -295,13 +310,20 @@ _SOLDE_FINAL = "solde au"
 # Certains relevés n'impriment pas leurs totaux sur les colonnes Débit/Crédit
 # mais dans un cartouche d'en-tête, sous la forme « libellé : montant ». Le
 # montant est capté en tolérant l'espace ou le point comme séparateur de
-# milliers, sans jamais déborder sur le montant suivant de la même ligne.
-_MONTANT_CARTOUCHE = r"(-?\d{1,3}(?:[\s.,]\d{3})*(?:[.,]\d{1,2})?)"
+# milliers, sans jamais déborder sur le montant suivant de la même ligne ; la
+# devise peut lui être accolée (« Total Debit XOF33,336,584.00 »).
+_MONTANT_CARTOUCHE = (
+    r"(?:xof|f\.?cfa|cfa|eur|usd)?\s*"
+    r"(-?\d{1,3}(?:[\s.,]\d{3})*(?:[.,]\d{1,2})?)"
+)
 _CARTOUCHE = (
-    ("solde_initial", r"ancien solde|solde precedent|report a nouveau"),
-    ("solde_final", r"nouveau solde|solde final"),
-    ("total_credits", r"(?:somme|total) des credits"),
-    ("total_debits", r"(?:somme|total) des debits"),
+    (
+        "solde_initial",
+        r"ancien solde|solde precedent|report a nouveau|opening balance",
+    ),
+    ("solde_final", r"nouveau solde|solde final|closing balance"),
+    ("total_credits", r"(?:somme|total)(?: des)? credits?"),
+    ("total_debits", r"(?:somme|total)(?: des)? debits?"),
 )
 
 
@@ -378,15 +400,23 @@ def _detecter_colonnes(ligne):
   arbitré par ordre de spécificité (« Date de valeur » est la colonne Valeur).
 
   Renvoie None si la ligne n'est pas un en-tête : il faut au minimum une colonne
-  Débit et une colonne Crédit pour pouvoir situer les montants.
+  Débit et une colonne Crédit pour pouvoir situer les montants, et aucun
+  chiffre — une ligne de cartouche « Total Debit … Total Credit … » porte les
+  deux mots-clés mais n'est pas un en-tête.
   """
+  if any(c.isdigit() for mot in ligne for c in mot["text"]):
+    return None
+
   emprises = {}
   for groupe in _grouper_entete(ligne):
     mots = [_normaliser(m["text"]) for m in groupe]
     colonne = next(
         (
             c
-            for c in ("debit", "credit", "solde", "valeur", "libelle", "date")
+            for c in (
+                "debit", "credit", "solde", "valeur", "libelle", "reference",
+                "date",
+            )
             if any(m in _MOTS_ENTETE[c] for m in mots)
         ),
         None,
@@ -562,7 +592,9 @@ def _extraire_par_coordonnees(pdf):
       # Pied de page : on arrête la lecture de la page en cours.
       if any(marqueur in texte_ligne for marqueur in _MARQUEURS_FIN):
         break
-      if _MOTIF_NUMERO_PAGE.match(texte_ligne):
+      if _MOTIF_NUMERO_PAGE.match(texte_ligne) or _MOTIF_PIED_HORODATE.match(
+          texte_ligne
+      ):
         continue
 
       limite_gauche = _limite_zone_gauche(emprises)
@@ -575,8 +607,13 @@ def _extraire_par_coordonnees(pdf):
       colonnes = {"valeur": [], "debit": [], "credit": [], "solde": []}
       droite_non_numerique = False
       for mot in mots_droite:
-        texte = mot["text"].strip()
+        texte = _MOTIF_DEVISE.sub("", mot["text"].strip())
         colonne = _colonne_du_mot(mot, emprises, frontieres)
+        if colonne == "reference":
+          # Référence interne de la banque, intercalée entre le libellé et les
+          # montants : ni l'un ni l'autre, et elle couperait le libellé en deux
+          # (« PAIEMENT CHEQUE N » … « 3521913 » sur la ligne suivante).
+          continue
         if colonne == "valeur" and _MOTIF_DATE.match(texte):
           colonnes["valeur"].append(texte)
         elif _MOTIF_NOMBRE.match(texte):

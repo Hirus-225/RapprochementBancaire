@@ -46,7 +46,9 @@ Deux fichiers, dans les bons formats.
 Le PDF d'origine de la banque, **non modifié**. L'outil sait lire les relevés où
 une seule des colonnes Débit / Crédit est renseignée par ligne, y compris
 lorsque les montants utilisent l'espace comme séparateur de milliers
-(`200 000`).
+(`200 000`). Il lit aussi les relevés rédigés en anglais (colonnes *Payments* /
+*Deposits*, dates `30-Jan-2026`, montants précédés de la devise comme
+`XOF6,000.00`).
 
 ### Le grand livre — au format Excel
 
