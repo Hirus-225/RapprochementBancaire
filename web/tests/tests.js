@@ -18,6 +18,8 @@ import { lirePages, ouvrirPdf } from "../js/pdf-mots.js";
 import { extraireParCoordonnees } from "../js/releve-coordonnees.js";
 import { controlerExtraction, extraireRelevePdf } from "../js/releve.js";
 import { extraireParTableaux, tableauxDeLaPage } from "../js/releve-tableaux.js";
+import { classeurResultats, enOctets } from "../js/export.js";
+import * as XLSX from "../vendor/sheetjs/xlsx.mjs";
 
 const RACINE_PROJET = new URL("../../", import.meta.url);
 const DOSSIER_REFERENCE = new URL("data_sortie/reference/", RACINE_PROJET);
@@ -617,6 +619,70 @@ function groupesEtape5(index, jeux) {
 }
 
 // ---------------------------------------------------------------------------
+// Étape 6 — export Excel
+// ---------------------------------------------------------------------------
+
+/** Feuilles d'un classeur relu : { nom: lignes de valeurs brutes }. */
+function contenuClasseur(octets) {
+  const classeur = XLSX.read(octets, { type: "array" });
+  return Object.fromEntries(classeur.SheetNames.map((nom) => [
+    nom,
+    XLSX.utils.sheet_to_json(classeur.Sheets[nom], { header: 1, raw: true, defval: null }),
+  ]));
+}
+
+/** Compare le classeur JS (relu) au classeur écrit par Python, cellule par cellule. */
+async function comparerClasseurs(octetsJs, cheminPython, contexte) {
+  const js = contenuClasseur(octetsJs);
+  const py = contenuClasseur(await lireFichier(cheminPython));
+  const cas = [comparer(JSON.stringify(Object.keys(js)), JSON.stringify(Object.keys(py)), {
+    ...contexte, controle: "feuilles",
+  })];
+  for (const [nom, lignesPy] of Object.entries(py)) {
+    const lignesJs = js[nom] ?? [];
+    const longueur = Math.max(lignesJs.length, lignesPy.length);
+    for (let i = 0; i < longueur; i++) {
+      cas.push(comparer(JSON.stringify(lignesJs[i] ?? "absente"), JSON.stringify(lignesPy[i] ?? "absente"), {
+        ...contexte, feuille: nom, ligne: i + 1,
+      }));
+    }
+  }
+  return cas;
+}
+
+function groupesEtape6(index, jeux) {
+  const annee = index.annee_courante;
+  return [
+    {
+      nom: "Classeur de résultat : jeux réels",
+      description:
+        "Chaîne JS complète (relevé PDF + grand livre Excel → rapprochement, réglage par défaut "
+        + "→ classeur), relue et comparée cellule par cellule au classeur écrit par app.py.",
+      cas: async () => {
+        const cas = [];
+        for (const jeu of jeux.filter((j) => j.grand_livre)) {
+          const releve = await extraireRelevePdf(await lireFichier(jeu.releve));
+          const banque = nettoyerDonnees(releve.operations, annee);
+          const compta = nettoyerDonnees(chargerGrandLivre(await lireFichier(jeu.grand_livre)), annee);
+          const classeur = classeurResultats(executerRapprochement(banque, compta), controlerExtraction(releve));
+          cas.push(...await comparerClasseurs(enOctets(classeur), jeu.export, { jeu: jeu.nom }));
+        }
+        return cas;
+      },
+    },
+    {
+      nom: "Classeur de résultat : rapprochement synthétique",
+      description: "Libellés absents (cellules vides), sans feuille de contrôles.",
+      cas: async () => {
+        const s = index.rapprochement_synthetique;
+        const classeur = classeurResultats(executerRapprochement(s.banque, s.compta));
+        return comparerClasseurs(enOctets(classeur), s.export, { jeu: "synthétique" });
+      },
+    },
+  ];
+}
+
+// ---------------------------------------------------------------------------
 // Affichage
 // ---------------------------------------------------------------------------
 
@@ -702,6 +768,7 @@ async function lancer() {
     ["Étape 3 — sens des montants et rapprochement", groupesEtape3(index, jeux)],
     ["Étape 4 — lecture des PDF et lecteur par coordonnées", groupesEtape4(index, jeux)],
     ["Étape 5 — lecteur par tableaux", groupesEtape5(index, jeux)],
+    ["Étape 6 — export Excel", groupesEtape6(index, jeux)],
   ]) {
     const resultat = await afficherEtape(titre, groupes);
     for (const cle of Object.keys(bilan)) bilan[cle] += resultat[cle];
