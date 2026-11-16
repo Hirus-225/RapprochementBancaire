@@ -13,7 +13,7 @@
 import * as outils from "../js/outils.js";
 import * as similarite from "../js/similarite.js";
 import { chargerGrandLivre } from "../js/grand-livre.js";
-import { nettoyerDonnees } from "../js/rapprochement.js";
+import { controlerSensMontants, executerRapprochement, nettoyerDonnees } from "../js/rapprochement.js";
 
 const RACINE_PROJET = new URL("../../", import.meta.url);
 const DOSSIER_REFERENCE = new URL("data_sortie/reference/", RACINE_PROJET);
@@ -255,6 +255,105 @@ function groupesEtape2(index, jeux) {
 }
 
 // ---------------------------------------------------------------------------
+// Étape 3 — sens des montants et rapprochement
+// ---------------------------------------------------------------------------
+
+/** Opérations de la référence sans le champ technique `rang_brut`. */
+const sansRang = (operations) => operations.map(({ date, libelle, montant }) => ({ date, libelle, montant }));
+
+/** Compare un rapprochement JS à un résultat Python (un réglage). */
+function comparerRapprochement(banque, compta, attendu, contexte) {
+  const reglage = `tolérance ${attendu.tolerance_jours} j, score ${attendu.score_minimum}`;
+  const obtenu = executerRapprochement(banque, compta, attendu.tolerance_jours, attendu.score_minimum);
+
+  const cas = [];
+  const longueur = Math.max(obtenu.rapprochees.length, attendu.rapprochees.length);
+  for (let i = 0; i < longueur; i++) {
+    const o = obtenu.rapprochees[i];
+    const a = attendu.rapprochees[i];
+    const jsEnListe = o && JSON.stringify([
+      o.idMatch, o.typeMatch, o.dateBanque, o.libelleBanque, o.montantBanque,
+      o.dateCompta, o.libelleCompta, o.montantCompta, o.score,
+    ]);
+    const pyEnListe = a && JSON.stringify([
+      a.id_match, a.type_match, a.date_banque, a.libelle_banque, a.montant_banque,
+      a.date_compta, a.libelle_compta, a.montant_compta, a.score,
+    ]);
+    cas.push(comparer(jsEnListe ?? "absente", pyEnListe ?? "absente", { ...contexte, reglage, rapprochement: i + 1 }));
+  }
+  cas.push(...comparerOperations(obtenu.manquantsCompta, attendu.manquants_compta, {
+    ...contexte, reglage, liste: "manquants en compta",
+  }));
+  cas.push(...comparerOperations(obtenu.manquantsBanque, attendu.manquants_banque, {
+    ...contexte, reglage, liste: "manquants en banque",
+  }));
+  return cas;
+}
+
+function groupesEtape3(index, jeux) {
+  const jeuxComplets = jeux.filter((j) => j.grand_livre);
+  const synthetique = index.rapprochement_synthetique;
+  return [
+    {
+      nom: "executerRapprochement : jeux réels",
+      description: "Trois passes sur les données nettoyées par Python, quatre réglages par jeu.",
+      cas: () => jeuxComplets.flatMap((jeu) => jeu.rapprochements.flatMap((attendu) => comparerRapprochement(
+        sansRang(jeu.releve_nettoye), sansRang(jeu.grand_livre_nettoye), attendu, { jeu: jeu.nom },
+      ))),
+    },
+    {
+      nom: "executerRapprochement : grands livres perturbés",
+      description: "Dates décalées de ±5 j et libellés retouchés : fait travailler les passes 2 et 3.",
+      cas: () => jeuxComplets.flatMap((jeu) => jeu.rapprochements_perturbes.resultats.flatMap((attendu) =>
+        comparerRapprochement(
+          sansRang(jeu.releve_nettoye), jeu.rapprochements_perturbes.grand_livre, attendu, { jeu: jeu.nom },
+        ))),
+    },
+    {
+      nom: "executerRapprochement : cas synthétiques",
+      description:
+        "Jumeaux, chèques à égale distance, bornes de tolérance et de score, libellé absent "
+        + "(lu « nan » par token_set_ratio, comme en Python).",
+      cas: () => synthetique.resultats.flatMap((attendu) => comparerRapprochement(
+        synthetique.banque, synthetique.compta, attendu, { jeu: "synthétique" },
+      )),
+    },
+    {
+      nom: "controlerSensMontants",
+      description: "Alerte d'inversion de signe : grand livre dans le bon sens, puis inversé.",
+      cas: () => [
+        comparer(controlerSensMontants(synthetique.banque, synthetique.compta), synthetique.alerte_sens, {
+          jeu: "synthétique",
+        }),
+        ...jeuxComplets.flatMap((jeu) => {
+          const banque = sansRang(jeu.releve_nettoye);
+          const compta = sansRang(jeu.grand_livre_nettoye);
+          const inverse = compta.map((o) => ({ ...o, montant: -o.montant }));
+          return [
+            comparer(controlerSensMontants(banque, compta), jeu.alerte_sens, { jeu: jeu.nom, sens: "direct" }),
+            comparer(controlerSensMontants(banque, inverse), jeu.alerte_sens_inverse, { jeu: jeu.nom, sens: "inversé" }),
+          ];
+        }),
+      ],
+    },
+    {
+      nom: "Chaîne grand livre → rapprochement",
+      description: "Grand livre lu et nettoyé par la version JS, relevé nettoyé par Python, réglage par défaut.",
+      cas: async () => {
+        const cas = [];
+        for (const jeu of jeuxComplets) {
+          const compta = nettoyerDonnees(chargerGrandLivre(await lireFichier(jeu.grand_livre)), index.annee_courante);
+          cas.push(...comparerRapprochement(
+            sansRang(jeu.releve_nettoye), compta, jeu.rapprochements[0], { jeu: jeu.nom },
+          ));
+        }
+        return cas;
+      },
+    },
+  ];
+}
+
+// ---------------------------------------------------------------------------
 // Affichage
 // ---------------------------------------------------------------------------
 
@@ -337,6 +436,7 @@ async function lancer() {
   for (const [titre, groupes] of [
     ["Étape 1 — outils et similarité", groupesEtape1(index, jeux, unicode)],
     ["Étape 2 — grand livre et nettoyage", groupesEtape2(index, jeux)],
+    ["Étape 3 — sens des montants et rapprochement", groupesEtape3(index, jeux)],
   ]) {
     const resultat = await afficherEtape(titre, groupes);
     for (const cle of Object.keys(bilan)) bilan[cle] += resultat[cle];

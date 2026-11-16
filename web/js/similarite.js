@@ -58,6 +58,8 @@ function ratioBrut(a, b) {
  * Aucun prétraitement : la casse et la ponctuation comptent.
  */
 export function ratio(s1, s2) {
+  // Libellé absent (NaN côté pandas) : rapidfuzz renvoie 0.
+  if (s1 == null || s2 == null) return 0; // `== null` vaut pour null et undefined
   return arrondiPair(ratioBrut(caracteres(String(s1)), caracteres(String(s2))));
 }
 
@@ -95,9 +97,13 @@ function comparerPointsDeCode(a, b) {
  * car le libellé bancaire porte souvent des références absentes de la compta.
  */
 export function tokenSetRatio(s1, s2) {
+  // Libellé absent : pandas le représente par NaN, que thefuzz ne reconnaît pas
+  // comme « absent » et convertit en texte — il devient le mot « nan ». Un
+  // libellé bancaire contenant « NAN » obtient donc 100. Reproduit tel quel.
+  const texte = (s) => (s == null ? "nan" : s);
   // `Set` ≈ `set` en Python : pas de doublons.
-  const motsA = new Set(pretraiter(s1).split(" ").filter(Boolean));
-  const motsB = new Set(pretraiter(s2).split(" ").filter(Boolean));
+  const motsA = new Set(pretraiter(texte(s1)).split(" ").filter(Boolean));
+  const motsB = new Set(pretraiter(texte(s2)).split(" ").filter(Boolean));
   if (motsA.size === 0 || motsB.size === 0) return 0;
 
   const communs = [...motsA].filter((m) => motsB.has(m));
