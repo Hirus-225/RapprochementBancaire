@@ -1,0 +1,31 @@
+/* Page de tests : tableau des groupes et détail des écarts. */
+
+.bilan {
+  padding: 12px 16px; border-radius: 8px; font-weight: 500;
+  background: var(--surface);
+}
+.bilan.ok { background: #E7F5EB; color: var(--success); }
+.bilan.echec { background: #FBEBEC; color: var(--danger); }
+
+.etape { margin-top: 32px; font-family: var(--font-display); font-weight: 500; }
+
+table.groupes { width: 100%; border-collapse: collapse; font-size: 14px; }
+table.groupes th, table.groupes td {
+  text-align: left; padding: 8px; border-bottom: 1px solid var(--border);
+  vertical-align: top;
+}
+table.groupes th { background: var(--surface); font-weight: 500; }
+table.groupes td.nombre {
+  text-align: right; font-family: var(--font-mono); font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.statut-ok { color: var(--success); }
+.statut-echec { color: var(--danger); font-weight: 600; }
+.description { color: var(--text-muted); font-size: 13px; }
+
+details { margin-top: 4px; }
+details pre {
+  font-family: var(--font-mono); font-size: 12px; white-space: pre-wrap;
+  background: var(--surface); padding: 8px; border-radius: 6px; margin: 4px 0 0;
+  max-height: 320px; overflow: auto;
+}

@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Tests de non-régression</title>
+  <link rel="icon" href="../favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="../css/style.css">
+  <link rel="stylesheet" href="tests.css">
+  <script type="module" src="tests.js"></script>
+</head>
+<body>
+  <h1>Tests de non-régression</h1>
+  <p>
+    Compare la version JavaScript aux résultats produits par <code>app.py</code>
+    (<code>script_reference_js.py</code>). Page de développement, à ouvrir en local :
+    lancer <code>python3 -m http.server</code> <strong>à la racine du projet</strong>,
+    puis <code>http://localhost:8000/web/tests/tests.html</code>.
+  </p>
+  <p id="bilan" class="bilan">Tests en cours…</p>
+  <div id="groupes"></div>
+</body>
+</html>
