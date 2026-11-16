@@ -1,8 +1,9 @@
-// Interface du site : équivalent de `_interface()` (app.py).
+// Interface du site.
 //
-// Différence de fond avec Streamlit : Streamlit réexécute tout le script à
-// chaque clic ; ici, la page est construite une fois, puis des fonctions sont
-// attachées aux événements (dépôt d'un fichier, curseur, bouton…).
+// La page est construite une fois (index.html), puis des fonctions sont
+// attachées aux événements : dépôt d'un fichier, curseur, bouton, navigation.
+// La logique métier vit dans les autres modules ; ce fichier ne fait que
+// l'enchaîner et en afficher le résultat.
 //
 // Sécurité : tout texte venant des fichiers de l'utilisateur (libellés…) est
 // inséré avec `textContent`, jamais comme du HTML — un libellé piégé ne peut
@@ -34,7 +35,7 @@ function element(balise, { classe, texte, attributs = {} } = {}, enfants = []) {
   return e;
 }
 
-/** Message coloré (≈ st.info / st.success / st.warning / st.error). */
+/** Message coloré : information, succès, avertissement ou erreur. */
 function alerte(genre, texte) {
   const role = genre === "error" || genre === "warning" ? "alert" : "status";
   return element("div", { classe: `alert alert--${genre}`, texte, attributs: { role } });
@@ -45,7 +46,7 @@ const formatNombre = new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 2 }
 const montant = (centimes) => (centimes == null ? "" : formatNombre.format(centimes / 100));
 
 /**
- * Tableau de données (≈ st.dataframe). `colonnes` : [{ titre, valeur(ligne),
+ * Tableau de données. `colonnes` : [{ titre, valeur(ligne),
  * genre }] ; genre « nombre » aligne à droite, « texte » (libellés) peut passer
  * à la ligne ; les autres colonnes restent sur une ligne.
  */
@@ -89,14 +90,14 @@ function tableauControles(lignes) {
   ], lignes);
 }
 
-/** Indicateur chiffré (≈ st.metric). */
+/** Indicateur chiffré. */
 const metrique = (libelle, valeur) => element("div", { classe: "metrique" }, [
   element("p", { classe: "metrique__libelle", texte: libelle }),
   element("p", { classe: "metrique__valeur", texte: String(valeur) }),
 ]);
 
 /**
- * Onglets accessibles (≈ st.tabs) : boutons role="tab", flèches gauche/droite
+ * Onglets accessibles : boutons role="tab", flèches gauche/droite
  * pour passer de l'un à l'autre, un seul panneau visible.
  */
 function onglets(definitions) {
@@ -212,9 +213,9 @@ for (const [curseur, sortie] of [[curseurTolerance, $("#tolerance-valeur")], [cu
 const resultats = $("#resultats");
 
 /**
- * Un fichier ou un réglage a changé : comme Streamlit, qui réexécute le script
- * et efface le résultat, on retire un résultat devenu périmé et on n'affiche le
- * bouton qu'une fois les deux fichiers déposés.
+ * Un fichier ou un réglage a changé : le résultat affiché ne correspond plus
+ * aux entrées, on le retire (il faut relancer). Le bouton n'apparaît qu'une
+ * fois les deux fichiers déposés.
  */
 function entreesModifiees() {
   resultats.replaceChildren();
@@ -227,7 +228,7 @@ function entreesModifiees() {
 // Rapprochement
 // ---------------------------------------------------------------------------
 
-/** Recoupement avec les totaux du relevé (`_afficher_controles`). */
+/** Recoupement avec les totaux du relevé : volet, avertissement ou erreur. */
 function afficherControles({ statut, tableau: lignes }) {
   if (statut === null) {
     return [alerte("warning",
@@ -263,7 +264,7 @@ async function lancer() {
 
   const afficher = (...elements) => resultats.append(...elements);
   try {
-    // `file.arrayBuffer()` lit le fichier déposé, dans le navigateur (≈ uploaded.getvalue()).
+    // `file.arrayBuffer()` lit le fichier déposé, dans le navigateur — rien n'est envoyé.
     const [octetsReleve, octetsGrandLivre] = await Promise.all([
       fichiers.releve.arrayBuffer(),
       fichiers["grand-livre"].arrayBuffer(),

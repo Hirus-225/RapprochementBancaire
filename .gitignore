@@ -36,11 +36,6 @@ pip-log.txt
 .ipynb_checkpoints/
 
 # ---------------------------------------------------------------------------
-# Streamlit
-# ---------------------------------------------------------------------------
-.streamlit/secrets.toml
-
-# ---------------------------------------------------------------------------
 # Secrets & configuration locale
 # ---------------------------------------------------------------------------
 .env
@@ -76,8 +71,9 @@ desktop.ini
 *.log
 
 # ---------------------------------------------------------------------------
-# Publication restreinte : seuls app.py et requirements.txt sont poussés
-# sur GitHub. Le CLI de test et la doc interne restent locaux.
+# Outils et documentation internes, gardés en local : traitement en lot,
+# génération des résultats de référence (ils lisent data_entree/) et notes
+# de travail.
 # ---------------------------------------------------------------------------
 script_rapprochement.py
 script_reference_js.py

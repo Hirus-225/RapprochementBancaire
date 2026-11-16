@@ -1,5 +1,5 @@
-// Classeur Excel de résultat : équivalent de `ecrire_resultats` (app.py) et du
-// bouton de téléchargement de l'interface Streamlit.
+// Classeur Excel de résultat : équivalent de `ecrire_resultats` (app.py), et
+// son téléchargement.
 //
 // Le classeur Python n'a aucune mise en forme (en-têtes non gras, format
 // « Standard ») : la version gratuite de SheetJS, qui n'écrit pas de styles,

@@ -1,6 +1,6 @@
 # Manuel de procédure — Rapprochement bancaire
 
-**Version 1.0 — 17 septembre 2026**
+**Version 2.0 — 16 novembre 2026**
 
 Confronter un relevé bancaire à votre grand livre comptable et obtenir, en un
 clic, la liste des opérations rapprochées et des écarts à traiter.
@@ -13,6 +13,7 @@ nécessaire.
 | **Destiné à** | Service comptable |
 | **Entrées** | Relevé PDF + grand livre Excel |
 | **Sortie** | Classeur Excel à 3 feuilles |
+| **Confidentialité** | Vos fichiers sont lus dans votre navigateur et ne sont envoyés nulle part |
 
 ---
 
@@ -39,7 +40,7 @@ absentes de la banque.
 
 ## 2. Ce qu'il vous faut
 
-Deux fichiers, dans les bons formats.
+Deux fichiers, dans les bons formats, et un navigateur à jour.
 
 ### Le relevé bancaire — au format PDF
 
@@ -54,32 +55,35 @@ lorsque les montants utilisent l'espace comme séparateur de milliers
 
 Un fichier `.xlsx` ou `.xls` contenant au minimum une colonne **date**, une
 colonne **libellé**, et soit des colonnes **Débit** et **Crédit**, soit une
-colonne **Montant**. Limitez l'extraction au compte banque et à la période du
+colonne **Montant**. Les intitulés de colonnes doivent figurer sur la
+**première ligne** de la feuille, et le grand livre sur la **première
+feuille** du classeur. Limitez l'extraction au compte banque et à la période du
 relevé.
 
-> **Attention aux données sensibles.** Ces fichiers contiennent des données
-> bancaires nominatives. Ne les déposez que dans l'outil prévu, et ne les
-> diffusez pas.
+### Un navigateur à jour
+
+Chrome, Edge, Firefox ou Safari, dans une version récente. Rien à installer.
+
+> **Vos données restent chez vous.** Les fichiers que vous déposez sont lus par
+> votre navigateur, sur votre ordinateur : ils ne sont envoyés à aucun serveur,
+> ni conservés une fois la page fermée. Ils contiennent néanmoins des données
+> bancaires nominatives : ne les diffusez pas.
 
 ---
 
 ## 3. Ouvrir l'outil
 
-L'outil s'utilise dans un navigateur web — rien à installer.
-
 Rendez-vous à l'adresse de l'application :
 
 ```
-rapprochement-facile.streamlit.app
+https://hirus-225.github.io/RapprochementBancaire/
 ```
 
-Ajoutez-la à vos favoris pour la retrouver facilement. Une page « Assistant de
+Ajoutez-la à vos favoris pour la retrouver facilement. La page « Assistant de
 rapprochement bancaire » s'affiche : deux zones de dépôt de fichiers au centre,
-et un panneau de paramètres sur la gauche.
-
-> **Mise en veille.** L'application peut se mettre en veille après une période
-> d'inactivité. Si un message « wake up » apparaît, cliquez sur le bouton proposé
-> et patientez quelques secondes : elle redémarre d'elle-même.
+et à gauche un panneau avec la navigation (**Rapprochement**, **Manuel de
+procédure**) et les paramètres. Sur un écran étroit, ce panneau passe au-dessus
+de la page.
 
 ---
 
@@ -89,12 +93,15 @@ Trois gestes suffisent ; le réglage des curseurs est facultatif.
 
 ### Étape 1 — Déposer le relevé bancaire
 
-Sous **1. Relevé bancaire**, glissez le PDF ou cliquez pour le sélectionner.
+Sous **1. Relevé Bancaire**, glissez le PDF dans la zone de dépôt, ou cliquez
+sur **Parcourir les fichiers** pour le sélectionner. Le nom du fichier s'affiche
+alors dans une pastille verte ; la croix **×** permet de le retirer.
 
 ### Étape 2 — Déposer le grand livre
 
-Sous **2. Grand livre comptable**, déposez le fichier Excel. Tant que les deux
-fichiers ne sont pas chargés, le bouton de lancement reste inactif.
+Sous **2. Grand Livre Comptable**, déposez le fichier Excel de la même façon.
+Tant que les deux fichiers ne sont pas déposés, un message vous le rappelle et
+le bouton de lancement n'apparaît pas.
 
 ### Étape 3 — Ajuster les paramètres (facultatif)
 
@@ -110,14 +117,19 @@ laissez-les tels quels en cas de doute.
 
 ### Étape 4 — Lancer
 
-Cliquez sur **Lancer le rapprochement**. Le traitement dure quelques secondes.
+Cliquez sur **Lancer le rapprochement**. Le message « Traitement en cours… »
+s'affiche quelques secondes.
+
+> **Changer un fichier ou un réglage efface le résultat.** Le résultat affiché
+> correspond toujours aux fichiers et aux réglages du moment : si vous en
+> modifiez un, cliquez de nouveau sur **Lancer le rapprochement**.
 
 ---
 
 ## 5. Lire l'écran de résultats
 
-Les chiffres clés en haut, le détail dans les onglets, le classeur à télécharger
-en bas.
+Le contrôle de l'extraction d'abord, puis les chiffres clés, le détail dans les
+onglets et le classeur à télécharger en bas.
 
 ### Les quatre indicateurs
 
@@ -131,31 +143,32 @@ en bas.
 ### Les trois onglets
 
 Ils reprennent le détail ligne à ligne : **Rapprochées**, **Dans la banque,
-absentes en compta** et **En compta, absentes de la banque**.
+absentes en compta** et **En compta, absentes de la banque**. Un tableau trop
+large pour l'écran défile horizontalement dans son cadre.
 
 ### Le classeur Excel
 
-Le bouton **Télécharger le fichier de résultat Excel** enregistre
-`resultat_rapprochement.xlsx`, avec une feuille par onglet plus, le cas échéant,
-une feuille **Contrôles extraction**. C'est ce fichier que vous conservez comme
-pièce de rapprochement.
+Le bouton **Télécharger le résultat (Excel)** enregistre
+`resultat_rapprochement.xlsx` dans votre dossier de téléchargements, avec une
+feuille par onglet plus, le cas échéant, une feuille **Contrôles extraction**.
+C'est ce fichier que vous conservez comme pièce de rapprochement.
 
 ---
 
 ## 6. Les contrôles et alertes
 
-**Avant d'exploiter un résultat, lisez toujours le bandeau de contrôle.** Il
-vous dit si l'extraction du relevé est fiable.
+**Avant d'exploiter un résultat, lisez toujours le contrôle d'extraction.** Il
+vous dit si la lecture du relevé est fiable.
 
-L'outil recoupe ce qu'il a lu dans le PDF avec les totaux imprimés en pied de
+L'outil recoupe ce qu'il a lu dans le PDF avec les totaux imprimés sur le
 relevé (nombre d'opérations, total des mouvements, solde de clôture recalculé).
 Trois situations possibles :
 
-| Bandeau | Ce que cela veut dire | Ce qu'il faut faire |
+| Affichage | Ce que cela veut dire | Ce qu'il faut faire |
 |---|---|---|
-| **Extraction vérifiée** | Les totaux lus correspondent à ceux du relevé : le tableau de contrôle (colonnes *Extrait*, *Annoncé par le relevé*, *Écart*) affiche un écart nul partout. | Vous pouvez exploiter le résultat en confiance. |
-| **Écart détecté** | Les totaux ne concordent pas : des opérations ont été mal lues ou omises. | N'exploitez pas le rapprochement et signalez le relevé au support. |
-| **Non vérifiable** | Le relevé ne porte aucun total de contrôle exploitable : l'extraction n'a pas pu être vérifiée automatiquement. | Le résultat peut être bon, mais recoupez vous-même le nombre d'opérations et les totaux avant de le valider. |
+| **Volet « Extraction vérifiée sur les totaux du relevé »** | Les totaux lus correspondent à ceux du relevé. Dépliez le volet : le tableau de contrôle (colonnes *Extrait*, *Annoncé par le relevé*, *Écart*) affiche un écart nul partout. | Vous pouvez exploiter le résultat en confiance. |
+| **Message rouge « L'extraction ne correspond pas… »** | Les totaux ne concordent pas : des opérations ont été mal lues ou omises. | N'exploitez pas le rapprochement et signalez le relevé au support. |
+| **Message orange « Ce relevé ne comporte pas de totaux de contrôle exploitables… »** | L'extraction n'a pas pu être vérifiée automatiquement. | Le résultat peut être bon, mais recoupez vous-même le nombre d'opérations et les totaux avant de le valider. |
 
 ### Alerte sur le sens des montants
 
@@ -215,7 +228,9 @@ chuter le rapprochement — d'où l'alerte du §6.
 ### Les montants sont comparés au centime près
 
 L'égalité des montants est **stricte** : aucune tolérance en centimes. Une
-différence d'arrondi laissera l'opération non rapprochée.
+différence d'arrondi laissera l'opération non rapprochée. Deux frais que la
+comptabilité aurait cumulés en une seule écriture ne sont pas non plus
+rapprochés : à vous de les arbitrer.
 
 ### Les numéros de chèque doivent concorder
 
@@ -223,10 +238,17 @@ L'appariement par chèque ignore les zéros de tête (`0412083` = `412083`), mai
 pas une différence de chiffre : un numéro divergent entre banque et compta reste
 à arbitrer à la main.
 
+### Les dates du grand livre doivent avoir une seule écriture
+
+Si les dates sont saisies en texte, elles doivent toutes suivre la même forme
+(par exemple `30/01/2026`) : une date écrite autrement (`2026-01-31`) est jugée
+invalide et sa ligne est écartée. Les dates au format date d'Excel ne posent pas
+ce problème.
+
 ### Un relevé sans totaux n'est pas vérifié automatiquement
 
 Sur ce type de relevé, le garde-fou d'extraction ne peut pas se prononcer (§6,
-alerte orange) : le recoupement manuel vous revient.
+message orange) : le recoupement manuel vous revient.
 
 ---
 
@@ -234,11 +256,14 @@ alerte orange) : le recoupement manuel vous revient.
 
 | Ce que vous constatez | Cause probable et conduite à tenir |
 |---|---|
-| Le bouton de lancement reste grisé | Un des deux fichiers n'est pas chargé. Vérifiez que le relevé et le grand livre sont bien déposés. |
-| « Aucune opération n'a pu être extraite » | Le PDF n'expose pas de colonnes Débit/Crédit lisibles (relevé scanné en image, format inhabituel). Fournissez le PDF d'origine de la banque, non scanné. |
-| Écart détecté (bandeau rouge) | Extraction incomplète ou erronée. N'exploitez pas le résultat ; transmettez le relevé au support. |
+| Le bouton **Lancer le rapprochement** n'apparaît pas | Un des deux fichiers n'est pas déposé. Vérifiez que les deux pastilles vertes sont affichées. |
+| « Fichier refusé : format attendu… » | Le fichier déposé n'a pas la bonne extension : un PDF pour le relevé, un `.xlsx` ou `.xls` pour le grand livre. |
+| « Aucune opération n'a pu être extraite » | Le PDF n'expose pas de colonnes Débit/Crédit lisibles (relevé scanné en simple image, sans texte, ou format inhabituel). Fournissez le PDF d'origine de la banque. |
+| Message rouge sur l'extraction | Extraction incomplète ou erronée. N'exploitez pas le résultat ; transmettez le relevé au support. |
 | Taux de rapprochement très bas | Souvent une inversion Débit/Crédit à l'export du grand livre (voir l'alerte de sens), ou une période / un compte qui ne correspondent pas au relevé. |
-| « Colonnes date ou libellé introuvables » | Le grand livre ne contient pas les colonnes attendues. Renommez-les clairement (date, libellé, débit, crédit) et ré-exportez. |
+| « Colonnes 'date' ou 'libellé' introuvables » | Le grand livre ne contient pas les colonnes attendues, ou ses intitulés ne sont pas sur la première ligne. Renommez-les clairement (date, libellé, débit, crédit) et ré-exportez. |
+| Le résultat a disparu | Un fichier ou un réglage a été modifié après le lancement (§4) : relancez le rapprochement. |
+| La page reste vide ou ne réagit pas | Navigateur trop ancien : mettez-le à jour, ou essayez un autre navigateur récent. |
 
 ---
 
@@ -246,4 +271,5 @@ alerte orange) : le recoupement manuel vous revient.
 
 | Version | Date | Changement |
 |---|---|---|
+| 2.0 | 16/11/2026 | Nouvelle version de l'outil, en site web : les fichiers sont traités dans le navigateur et ne sont plus envoyés à un serveur. Nouvelle adresse, nouveaux libellés de l'écran. |
 | 1.0 | 17/09/2026 | Première rédaction, reprise du manuel HTML embarqué dans l'application. |

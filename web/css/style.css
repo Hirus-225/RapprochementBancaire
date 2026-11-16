@@ -1,7 +1,7 @@
-/* Design system « Assistant de rapprochement » — version site statique.
-   Les jetons sont ceux du kit, déclarés jusqu'ici à deux endroits pour
-   Streamlit (`_STYLE` dans app.py et `.streamlit/config.toml`) : ils ne vivent
-   plus qu'ici. Les composants reprennent ceux que Streamlit dessinait. */
+/* Design system « Assistant de rapprochement ».
+   Seul fichier de style du site : jetons du kit (couleurs, typographies,
+   espacements, rayons), puis composants (navigation, curseurs, boutons, zones
+   de dépôt, messages, indicateurs, onglets, tableaux, manuel). */
 
 @import url("../vendor/fonts/polices.css");
 
@@ -32,7 +32,7 @@
   --ring: 0 0 0 3px rgba(14,122,99,.25);
   --ease: cubic-bezier(.2,.7,.3,1);
 
-  /* Thème clair imposé, comme l'application Streamlit (base = "light"). */
+  /* Thème clair imposé : le site n'a qu'un rendu, même si le système est en sombre. */
   color-scheme: light;
 }
 
@@ -188,7 +188,7 @@ code, kbd { font-family: var(--font-mono); font-size: .9em; }
 .alert--warning { background: var(--warning-bg); color: var(--warning); border-color: var(--warning-border); }
 .alert--error   { background: var(--danger-bg);  color: var(--danger);  border-color: var(--danger-border); }
 
-/* Traitement en cours (≈ st.spinner) */
+/* Traitement en cours */
 .progression { display: flex; align-items: center; gap: var(--sp-3); margin: var(--sp-4) 0; font-size: var(--text-sm); color: var(--text-muted); }
 .spinner {
   width: 18px; height: 18px; border-radius: 50%;

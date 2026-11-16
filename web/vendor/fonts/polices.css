@@ -1,5 +1,5 @@
-/* Polices du kit « Assistant de rapprochement », servies en local
-   (remplace l'@import Google Fonts de `_STYLE` dans app.py). Sous-ensemble latin. */
+/* Polices du kit « Assistant de rapprochement », servies par le site lui-même
+   (aucun appel à Google Fonts). Sous-ensemble latin. */
 
 @font-face {
   font-family: "Fraunces";
