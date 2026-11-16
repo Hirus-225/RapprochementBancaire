@@ -17,6 +17,7 @@ import { controlerSensMontants, executerRapprochement, nettoyerDonnees } from ".
 import { lirePages, ouvrirPdf } from "../js/pdf-mots.js";
 import { extraireParCoordonnees } from "../js/releve-coordonnees.js";
 import { controlerExtraction, extraireRelevePdf } from "../js/releve.js";
+import { extraireParTableaux, tableauxDeLaPage } from "../js/releve-tableaux.js";
 
 const RACINE_PROJET = new URL("../../", import.meta.url);
 const DOSSIER_REFERENCE = new URL("data_sortie/reference/", RACINE_PROJET);
@@ -463,6 +464,34 @@ function groupesEtape4(index, jeux) {
       },
     },
     {
+      nom: "Relevés PDF synthétiques",
+      description:
+        "PDF fabriqués par le script de référence : colonne « Reference Number » présente aussi "
+        + "sur les lignes de suite du libellé (règle qui l'écarte), cartouche de totaux.",
+      cas: async () => {
+        const cas = [];
+        for (const r of index.releves_synthetiques) {
+          const contexte = { releve: r.nom };
+          let releve;
+          try {
+            releve = await extraireRelevePdf(await lireFichier(r.fichier));
+          } catch (erreur) {
+            cas.push(comparer(erreur.message, r.erreur ?? "(pas d'erreur attendue)", contexte));
+            continue;
+          }
+          if (r.erreur) {
+            cas.push(comparer("(aucune erreur)", r.erreur, contexte));
+            continue;
+          }
+          cas.push(...comparerMots(await pagesDuReleve(r.fichier), r.pages, r.nom));
+          cas.push(...comparerOperations(releve.operations, r.releve_brut, contexte));
+          const { statut } = controlerExtraction(releve);
+          cas.push(comparer(statut, r.controle_extraction.statut, { ...contexte, controle: "statut" }));
+        }
+        return cas;
+      },
+    },
+    {
       nom: "controlerExtraction",
       description: "Recoupement avec les totaux du relevé, sur les opérations et totaux lus par Python.",
       cas: () => jeux.map((jeu) => {
@@ -496,6 +525,92 @@ function groupesEtape4(index, jeux) {
           ));
         }
         return cas;
+      },
+    },
+  ];
+}
+
+// ---------------------------------------------------------------------------
+// Étape 5 — lecteur par tableaux
+// ---------------------------------------------------------------------------
+
+// La référence arrondit les positions au millième : on compare à 0,0015 pt près.
+const memePosition = (a, b) => Math.abs(a - b) <= 0.0015;
+const memesPositions = (as, bs) =>
+  as.length === bs.length && as.every((a, i) => (typeof a === "number" ? memePosition(a, bs[i]) : a === bs[i]));
+
+function comparerListes(nom, js, python, egal, contexte) {
+  const cas = [comparer(js.length, python.length, { ...contexte, controle: `nombre de ${nom}` })];
+  for (let i = 0; i < Math.min(js.length, python.length); i++) {
+    cas.push({
+      statut: egal(js[i], python[i]) ? "conforme" : "ecart",
+      detail: { ...contexte, [nom]: i, js: js[i], python: python[i] },
+    });
+  }
+  return cas;
+}
+
+function groupesEtape5(index, jeux) {
+  const annee = index.annee_courante;
+  const jeuTableaux = jeux.find((j) => j.nom === "sib_tableaux");
+  return [
+    {
+      nom: "Tableaux : arêtes, cellules, contenu",
+      description:
+        "Détection des tableaux (TableFinder de pdfplumber) page par page sur les quatre relevés : "
+        + "arêtes aimantées et jointes, cellules, puis tableaux (emprise, cellules, texte).",
+      cas: async () => {
+        const cas = [];
+        for (const jeu of jeux) {
+          const pages = await pagesDuReleve(jeu.releve);
+          jeu.pages.forEach((pagePy, p) => {
+            const contexte = { jeu: jeu.nom, page: p + 1 };
+            const { aretes, cellules, tableaux } = tableauxDeLaPage(pages[p]);
+            cas.push(...comparerListes(
+              "aretes",
+              aretes.map((a) => [a.x0, a.top, a.x1, a.bottom, a.orientation]),
+              pagePy.aretes,
+              memesPositions,
+              contexte,
+            ));
+            cas.push(...comparerListes("cellules", cellules, pagePy.cellules, memesPositions, contexte));
+            cas.push(...comparerListes("tableaux", tableaux, pagePy.tableaux, (t, py) =>
+              memesPositions(t.bbox, py.bbox)
+              && t.lignes.length === py.lignes.length
+              && t.lignes.every((ligne, l) => ligne.length === py.lignes[l].length
+                && ligne.every((c, k) => (c === null ? py.lignes[l][k] === null : memesPositions(c, py.lignes[l][k]))))
+              && JSON.stringify(t.contenu) === JSON.stringify(py.contenu), contexte));
+          });
+        }
+        return cas;
+      },
+    },
+    {
+      nom: "extraireParTableaux",
+      description: "Opérations lues dans les tableaux de l'« Extrait de compte » (sib_tableaux).",
+      cas: async () => comparerOperations(
+        extraireParTableaux(await pagesDuReleve(jeuTableaux.releve)),
+        jeuTableaux.releve_brut,
+        { jeu: jeuTableaux.nom },
+      ),
+    },
+    {
+      nom: "Chaîne relevé par tableaux → rapprochement",
+      description:
+        "extraireRelevePdf se rabat sur les tableaux ; contrôle « non vérifiable » (null) ; "
+        + "nettoyage et rapprochement avec le grand livre lu par JS, quatre réglages.",
+      cas: async () => {
+        const contexte = { jeu: jeuTableaux.nom };
+        const releve = await extraireRelevePdf(await lireFichier(jeuTableaux.releve));
+        const banque = nettoyerDonnees(releve.operations, annee);
+        const compta = nettoyerDonnees(chargerGrandLivre(await lireFichier(jeuTableaux.grand_livre)), annee);
+        return [
+          ...comparerOperations(releve.operations, jeuTableaux.releve_brut, { ...contexte, phase: "brut" }),
+          comparer(controlerExtraction(releve).statut, jeuTableaux.controle_extraction.statut, {
+            ...contexte, controle: "statut",
+          }),
+          ...jeuTableaux.rapprochements.flatMap((attendu) => comparerRapprochement(banque, compta, attendu, contexte)),
+        ];
       },
     },
   ];
@@ -586,6 +701,7 @@ async function lancer() {
     ["Étape 2 — grand livre et nettoyage", groupesEtape2(index, jeux)],
     ["Étape 3 — sens des montants et rapprochement", groupesEtape3(index, jeux)],
     ["Étape 4 — lecture des PDF et lecteur par coordonnées", groupesEtape4(index, jeux)],
+    ["Étape 5 — lecteur par tableaux", groupesEtape5(index, jeux)],
   ]) {
     const resultat = await afficherEtape(titre, groupes);
     for (const cle of Object.keys(bilan)) bilan[cle] += resultat[cle];

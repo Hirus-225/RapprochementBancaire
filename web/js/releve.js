@@ -3,15 +3,7 @@
 
 import { lirePages, ouvrirPdf } from "./pdf-mots.js";
 import { extraireParCoordonnees } from "./releve-coordonnees.js";
-
-/**
- * Lecteur par tableaux (relevés « Extrait de compte »), utilisé quand le
- * lecteur par coordonnées ne trouve aucune opération. Écrit à l'étape 5 de la
- * migration : d'ici là, il ne trouve rien.
- */
-async function extraireParTableaux(_pages) {
-  return [];
-}
+import { extraireParTableaux } from "./releve-tableaux.js";
 
 /**
  * Extrait les opérations d'un relevé PDF (contenu en octets). Renvoie
@@ -26,8 +18,10 @@ export async function extraireRelevePdf(octets) {
     try {
       const pages = await lirePages(pdf);
       ({ operations, controles } = extraireParCoordonnees(pages));
+      // Aucune opération : relevé sans colonnes repérables par leur position
+      // (« Extrait de compte ») — on se rabat sur ses tableaux, sans totaux.
       if (operations.length === 0) {
-        operations = await extraireParTableaux(pages);
+        operations = extraireParTableaux(pages);
         controles = {};
       }
     } finally {

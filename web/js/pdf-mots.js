@@ -59,6 +59,34 @@ function translater([a, b, c, d, e, f], x, y) {
 
 const point = ([a, b, c, d, e, f], x, y) => [a * x + c * y + e, b * x + d * y + f];
 
+/**
+ * Nombre décimal écrit dans le PDF, retrouvé à partir de sa valeur en
+ * précision simple.
+ *
+ * PDF.js range les matrices de texte et les tracés dans des Float32Array :
+ * « 14.17 » y devient 14.170000076293945. pdfminer, lui, lit 14.17 en double
+ * précision. Or pdfplumber compare des positions par égalité exacte (sommets
+ * des cellules d'un tableau) : on retrouve donc le décimal le plus court qui,
+ * arrondi en précision simple, redonne la même valeur — celui du fichier. Un
+ * nombre qui n'est pas représentable en précision simple est déjà en double
+ * précision : il est rendu tel quel.
+ *
+ * Précaution : sur les quatre relevés de référence, la retirer ne change aucun
+ * résultat (leurs tableaux tombent sur des valeurs exactes en précision simple).
+ * Elle protège un relevé futur dont les égalités ne tiendraient qu'en double.
+ */
+export function decimal(x) {
+  if (Number.isInteger(x) || Math.fround(x) !== x) return x;
+  for (let chiffres = 1; chiffres <= 9; chiffres++) {
+    const candidat = Number(x.toPrecision(chiffres));
+    if (Math.fround(candidat) === x) return candidat;
+  }
+  return x;
+}
+
+/** Une matrice (ou des arguments) en nombres ordinaires, décimaux retrouvés. */
+const nombres = (valeurs) => Array.from(valeurs, decimal);
+
 /** Rectangle englobant l'image d'un rectangle par une matrice. */
 function rectangle(m, x0, y0, x1, y1) {
   const coins = [point(m, x0, y0), point(m, x1, y0), point(m, x1, y1), point(m, x0, y1)];
@@ -68,7 +96,7 @@ function rectangle(m, x0, y0, x1, y1) {
 }
 
 // ---------------------------------------------------------------------------
-// Caractères
+// Caractères et traits
 // ---------------------------------------------------------------------------
 
 function etatTexteInitial() {
@@ -94,10 +122,13 @@ function police(page, nom) {
 }
 
 /**
- * Caractères d'une page : { texte, x0, x1, top, bottom, droit }, dans l'ordre
- * du flux, avec `top` mesuré depuis le haut de la page (convention pdfplumber).
+ * Parcourt les instructions de dessin d'une page et renvoie :
+ *   - caracteres : { texte, x0, x1, top, bottom, droit }, dans l'ordre du flux ;
+ *   - objets : traits peints (« line », « rect », « curve »), comme les classe
+ *     pdfminer — ils servent au lecteur par tableaux.
+ * Coordonnées de pdfplumber : `top` est mesuré depuis le haut de la page.
  */
-async function caracteresDePage(page) {
+async function analyserPage(page) {
   const liste = await page.getOperatorList({ annotationMode: pdfjsLib.AnnotationMode.DISABLE });
   const [vx0, vy0, , vy1] = page.view;
   const hauteur = vy1 - vy0;
@@ -115,6 +146,7 @@ async function caracteresDePage(page) {
   let texte = etatTexteInitial();
   const pile = []; // sauvegardes q / Q (≈ list utilisée comme pile)
   const caracteres = [];
+  const objets = [];
 
   for (const [i, op] of liste.fnArray.entries()) {
     const args = liste.argsArray[i];
@@ -126,11 +158,11 @@ async function caracteresDePage(page) {
         if (pile.length) ({ ctm, texte } = pile.pop());
         break;
       case OPS.transform:
-        ctm = multiplier(args, ctm);
+        ctm = multiplier(nombres(args), ctm);
         break;
       case OPS.paintFormXObjectBegin:
         pile.push({ ctm, texte: structuredClone(texte) });
-        if (args[0]) ctm = multiplier(args[0], ctm);
+        if (args[0]) ctm = multiplier(nombres(args[0]), ctm);
         break;
       case OPS.paintFormXObjectEnd:
         if (pile.length) ({ ctm, texte } = pile.pop());
@@ -159,9 +191,8 @@ async function caracteresDePage(page) {
         break;
       case OPS.setTextMatrix:
         // PDF.js transmet ici la matrice enveloppée — [Float32Array(6)] —, et non
-        // ses six nombres à plat comme pour `transform`. Array.from en fait un
-        // tableau ordinaire (≈ list(…)).
-        texte.matrice = Array.from(args.length === 1 ? args[0] : args);
+        // ses six nombres à plat comme pour `transform`.
+        texte.matrice = nombres(args.length === 1 ? args[0] : args);
         texte.ligne = [0, 0];
         break;
       case OPS.setLeadingMoveText:
@@ -183,11 +214,96 @@ async function caracteresDePage(page) {
       case OPS.showText:
         texte.ligne = afficherTexte(args[0], texte, ctm, polices, hauteur, caracteres);
         break;
+      case OPS.constructPath:
+        peindre(args, ctm, hauteur, objets);
+        break;
       default:
-        break; // tracés, couleurs, images… sans effet sur le texte
+        break; // couleurs, images… sans effet sur le texte ni les traits
     }
   }
-  return caracteres;
+  return { caracteres, objets };
+}
+
+// Codes des segments d'un tracé dans les données de `constructPath` (PDF.js 6).
+const SEGMENT = { 0: "m", 1: "l", 2: "c", 3: "c", 4: "h" };
+const NOMBRE_DE_COORDONNEES = { m: 2, l: 2, c: 6, h: 0 };
+const PEINTURES_FERMANTES = new Set([OPS.closeStroke, OPS.closeFillStroke, OPS.closeEOFillStroke]);
+const PEINTURES = new Set([
+  OPS.stroke, OPS.closeStroke, OPS.fill, OPS.eoFill, OPS.fillStroke, OPS.eoFillStroke,
+  OPS.closeFillStroke, OPS.closeEOFillStroke,
+]);
+
+/**
+ * Tracé peint : `constructPath` porte [peinture, [données], boîte]. Les
+ * données enchaînent un code de segment et ses coordonnées. Un tracé non peint
+ * (`endPath`, découpe) ne laisse aucun trait, comme dans pdfminer.
+ */
+function peindre([peinture, [donnees] = []], ctm, hauteur, objets) {
+  if (!PEINTURES.has(peinture) || !donnees) return;
+  const segments = [];
+  for (let i = 0; i < donnees.length;) {
+    const lettre = SEGMENT[donnees[i]];
+    if (lettre === undefined) return; // code inconnu : on ne devine pas
+    const n = donnees[i] === 3 ? 4 : NOMBRE_DE_COORDONNEES[lettre];
+    segments.push([lettre, ...nombres(donnees.slice(i + 1, i + 1 + n))]);
+    i += 1 + n;
+  }
+  if (PEINTURES_FERMANTES.has(peinture)) segments.push(["h"]);
+  classerChemin(segments, ctm, hauteur, objets);
+}
+
+/** Classe un chemin en trait, rectangle ou courbe (`paint_path` de pdfminer). */
+function classerChemin(segments, ctm, hauteur, objets) {
+  let forme = segments.map((s) => s[0]).join("");
+  if (forme[0] !== "m") return;
+  if (forme.split("m").length - 1 > 1) {
+    // Plusieurs sous-chemins : chacun est classé à part (« m » suivi d'autre chose).
+    for (const m of forme.matchAll(/m[^m]+/g)) {
+      classerChemin(segments.slice(m.index, m.index + m[0].length), ctm, hauteur, objets);
+    }
+    return;
+  }
+
+  // Un point par segment : sa destination (le point de départ pour « h »).
+  const pts = segments.map((s) => {
+    const [x, y] = s[0] === "h" ? segments[0].slice(-2) : s.slice(-2);
+    return point(ctm, x, y);
+  });
+  const memePoint = (p, q) => p[0] === q[0] && p[1] === q[1];
+  if (forme.length > 3 && forme.endsWith("lh") && memePoint(pts.at(-2), pts[0])) {
+    forme = `${forme.slice(0, -2)}h`;
+    pts.pop();
+  }
+
+  if (forme === "mlh" || forme === "ml") {
+    objets.push(objetGraphique("line", [pts[0], pts[1]], hauteur));
+  } else if (forme === "mlllh" || forme === "mllll") {
+    const [[x0, y0], [x1, y1], [x2, y2], [x3, y3]] = pts;
+    const ferme = memePoint(pts[0], pts[4]);
+    const carre =
+      (x0 === x1 && y1 === y2 && x2 === x3 && y3 === y0) ||
+      (y0 === y1 && x1 === x2 && y2 === y3 && x3 === x0);
+    if (ferme && carre) objets.push(objetGraphique("rect", [pts[0], pts[2]], hauteur));
+    else objets.push(objetGraphique("curve", pts, hauteur));
+  } else {
+    objets.push(objetGraphique("curve", pts, hauteur));
+  }
+}
+
+/** Objet graphique aux coordonnées de pdfplumber (rectangle englobant de ses points). */
+function objetGraphique(type, pts, hauteur) {
+  const xs = pts.map((p) => p[0]);
+  const ys = pts.map((p) => p[1]);
+  const [x0, x1, y0, y1] = [Math.min(...xs), Math.max(...xs), Math.min(...ys), Math.max(...ys)];
+  return {
+    type,
+    x0, x1,
+    top: hauteur - y1,
+    bottom: hauteur - y0,
+    width: x1 - x0,
+    height: y1 - y0,
+    pts: pts.map(([x, y]) => [x, hauteur - y]),
+  };
 }
 
 /**
@@ -247,7 +363,7 @@ function afficherTexte(glyphes, texte, ctm, polices, hauteur, caracteres) {
 // ---------------------------------------------------------------------------
 
 /** Regroupe des valeurs en chaîne : écart ≤ tolérance avec la précédente. */
-function grappes(valeurs, tolerance) {
+export function grappes(valeurs, tolerance) {
   const triees = [...new Set(valeurs)].sort((a, b) => a - b);
   const indice = new Map();
   let numero = 0;
@@ -300,7 +416,7 @@ function motsDeLigne(caracteres) {
 }
 
 /** Mots d'une page, dans l'ordre de `page.extract_words()` de pdfplumber. */
-function motsDePage(caracteres) {
+export function motsDePage(caracteres) {
   const mots = [];
   // Les caractères se suivent par blocs de même orientation (itertools.groupby).
   let debut = 0;
@@ -351,16 +467,17 @@ function lignesDeMots(mots, tolerance = 3.0) {
 }
 
 /**
- * Lit toutes les pages d'un PDF ouvert : pour chacune, ses dimensions et ses
- * lignes de mots { texte, x0, x1, top, bottom }.
+ * Lit toutes les pages d'un PDF ouvert : pour chacune, ses dimensions, ses
+ * lignes de mots { texte, x0, x1, top, bottom }, ses caractères et ses traits.
  */
 export async function lirePages(pdf) {
   const pages = [];
   for (let numero = 1; numero <= pdf.numPages; numero++) {
     const page = await pdf.getPage(numero);
     const [x0, y0, x1, y1] = page.view;
-    const mots = motsDePage(await caracteresDePage(page));
-    pages.push({ numero, largeur: x1 - x0, hauteur: y1 - y0, lignes: lignesDeMots(mots), page });
+    const { caracteres, objets } = await analyserPage(page);
+    const lignes = lignesDeMots(motsDePage(caracteres));
+    pages.push({ numero, largeur: x1 - x0, hauteur: y1 - y0, lignes, caracteres, objets });
   }
   return pages;
 }
