@@ -12,8 +12,18 @@
 
 import * as outils from "../js/outils.js";
 import * as similarite from "../js/similarite.js";
+import { chargerGrandLivre } from "../js/grand-livre.js";
+import { nettoyerDonnees } from "../js/rapprochement.js";
 
-const DOSSIER_REFERENCE = new URL("../../data_sortie/reference/", import.meta.url);
+const RACINE_PROJET = new URL("../../", import.meta.url);
+const DOSSIER_REFERENCE = new URL("data_sortie/reference/", RACINE_PROJET);
+
+/** Contenu brut d'un fichier du projet (relevé, grand livre), en octets. */
+async function lireFichier(chemin) {
+  const reponse = await fetch(new URL(encodeURI(chemin), RACINE_PROJET));
+  if (!reponse.ok) throw new Error(`${chemin} : HTTP ${reponse.status}`);
+  return new Uint8Array(await reponse.arrayBuffer());
+}
 
 async function lireJson(nom) {
   const reponse = await fetch(new URL(nom, DOSSIER_REFERENCE));
@@ -162,6 +172,89 @@ function groupesEtape1(index, jeux, unicode) {
 }
 
 // ---------------------------------------------------------------------------
+// Étape 2 — grand-livre.js et nettoyerDonnees
+// ---------------------------------------------------------------------------
+
+/** Date brute écrite comme dans la référence Python (Timestamp.isoformat()). */
+function dateBrute(date) {
+  if (date === null || typeof date !== "object") return date;
+  const d2 = (n) => String(n).padStart(2, "0");
+  return `${date.annee}-${d2(date.mois)}-${d2(date.jour)}T${d2(date.heure)}:${d2(date.minute)}:${d2(date.seconde)}`;
+}
+
+/** Compare deux listes d'opérations ligne à ligne (un cas par ligne). */
+function comparerOperations(obtenues, attendues, contexte) {
+  const cas = [];
+  const longueur = Math.max(obtenues.length, attendues.length);
+  for (let i = 0; i < longueur; i++) {
+    const o = obtenues[i];
+    const a = attendues[i];
+    const enListe = (x) => (x ? JSON.stringify([dateBrute(x.date), x.libelle, x.montant]) : "absente");
+    cas.push(comparer(enListe(o), enListe(a), { ...contexte, ligne: i }));
+  }
+  return cas;
+}
+
+/** Charge un grand livre et compare brut, nettoyé ou message d'erreur. */
+async function casGrandLivre(chemin, attendu, contexte, anneeCourante) {
+  let brut;
+  try {
+    brut = chargerGrandLivre(await lireFichier(chemin));
+  } catch (erreur) {
+    return [comparer(erreur.message, attendu.erreur ?? "(pas d'erreur attendue)", contexte)];
+  }
+  if (attendu.erreur) return [comparer("(aucune erreur)", attendu.erreur, contexte)];
+  return [
+    ...comparerOperations(brut, attendu.brut, { ...contexte, phase: "brut" }),
+    ...comparerOperations(nettoyerDonnees(brut, anneeCourante), attendu.nettoye, {
+      ...contexte, phase: "nettoyé",
+    }),
+  ];
+}
+
+function groupesEtape2(index, jeux) {
+  const annee = index.annee_courante;
+  return [
+    {
+      nom: "chargerGrandLivre : grands livres réels",
+      description: "Lecture SheetJS + typage pandas, puis nettoyage, sur les grands livres des jeux de référence.",
+      cas: async () => {
+        const cas = [];
+        for (const jeu of jeux.filter((j) => j.grand_livre)) {
+          cas.push(...await casGrandLivre(
+            jeu.grand_livre,
+            { brut: jeu.grand_livre_brut, nettoye: jeu.grand_livre_nettoye },
+            { jeu: jeu.nom },
+            annee,
+          ));
+        }
+        return cas;
+      },
+    },
+    {
+      nom: "chargerGrandLivre : classeurs synthétiques",
+      description: "Règles de lecture une à une (types mêlés, en-têtes, valeurs manquantes, .xls, erreurs).",
+      cas: async () => {
+        const cas = [];
+        for (const g of index.grands_livres_synthetiques) {
+          cas.push(...await casGrandLivre(g.fichier, g, { classeur: g.nom }, annee));
+        }
+        return cas;
+      },
+    },
+    {
+      nom: "nettoyerDonnees : relevés",
+      description: "Nettoyage du côté banque, à partir des opérations extraites par Python.",
+      cas: async () => jeux.flatMap((jeu) => comparerOperations(
+        nettoyerDonnees(jeu.releve_brut, annee),
+        jeu.releve_nettoye,
+        { jeu: jeu.nom },
+      )),
+    },
+  ];
+}
+
+// ---------------------------------------------------------------------------
 // Affichage
 // ---------------------------------------------------------------------------
 
@@ -175,7 +268,7 @@ function element(balise, texte = "", classe = "") {
 
 const nombreFr = (n) => n.toLocaleString("fr-FR");
 
-function afficherEtape(titre, groupes) {
+async function afficherEtape(titre, groupes) {
   const conteneur = document.querySelector("#groupes");
   conteneur.append(element("h2", titre, "etape"));
 
@@ -190,7 +283,7 @@ function afficherEtape(titre, groupes) {
     const debut = performance.now();
     let cas;
     try {
-      cas = groupe.cas();
+      cas = await groupe.cas(); // `await` sur une valeur ordinaire la renvoie telle quelle
     } catch (erreur) {
       cas = [{ statut: "ecart", detail: { erreur: erreur.message, pile: erreur.stack } }];
     }
@@ -240,7 +333,14 @@ async function lancer() {
     return;
   }
 
-  const bilan = afficherEtape("Étape 1 — outils et similarité", groupesEtape1(index, jeux, unicode));
+  const bilan = { conformes: 0, ecarts: 0, toleres: 0 };
+  for (const [titre, groupes] of [
+    ["Étape 1 — outils et similarité", groupesEtape1(index, jeux, unicode)],
+    ["Étape 2 — grand livre et nettoyage", groupesEtape2(index, jeux)],
+  ]) {
+    const resultat = await afficherEtape(titre, groupes);
+    for (const cle of Object.keys(bilan)) bilan[cle] += resultat[cle];
+  }
 
   const total = bilan.conformes + bilan.ecarts + bilan.toleres;
   elementBilan.textContent =
