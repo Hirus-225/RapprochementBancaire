@@ -76,7 +76,7 @@ Chrome, Edge, Firefox ou Safari, dans une version récente. Rien à installer.
 Rendez-vous à l'adresse de l'application :
 
 ```
-https://hirus-225.github.io/RapprochementBancaire/
+https://charleszogoue.ci/RapprochementBancaire/
 ```
 
 Ajoutez-la à vos favoris pour la retrouver facilement. La page « Assistant de

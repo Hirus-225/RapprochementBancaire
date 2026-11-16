@@ -13,7 +13,7 @@ poste de l'utilisateur et ne sont envoyés nulle part. Pas de compte, pas de
 base de données, pas d'historique. Une politique de sécurité (CSP) interdit
 d'ailleurs à la page tout échange avec un autre site.
 
-L'application en ligne : <https://hirus-225.github.io/RapprochementBancaire/>
+L'application en ligne : <https://charleszogoue.ci/RapprochementBancaire/>
 
 ## Ce que l'outil fait — et ne fait pas
 
