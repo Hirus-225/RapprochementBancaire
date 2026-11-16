@@ -14,6 +14,9 @@ import * as outils from "../js/outils.js";
 import * as similarite from "../js/similarite.js";
 import { chargerGrandLivre } from "../js/grand-livre.js";
 import { controlerSensMontants, executerRapprochement, nettoyerDonnees } from "../js/rapprochement.js";
+import { lirePages, ouvrirPdf } from "../js/pdf-mots.js";
+import { extraireParCoordonnees } from "../js/releve-coordonnees.js";
+import { controlerExtraction, extraireRelevePdf } from "../js/releve.js";
 
 const RACINE_PROJET = new URL("../../", import.meta.url);
 const DOSSIER_REFERENCE = new URL("data_sortie/reference/", RACINE_PROJET);
@@ -97,6 +100,7 @@ function groupesEtape1(index, jeux, unicode) {
 
   const ESPACE_SEUL = new RegExp(`^${outils.ESPACE}$`);
   const MOT_SEUL = new RegExp(`^${outils.MOT}$`, "u");
+  const CHIFFRE_ISDIGIT_SEUL = new RegExp(`^${outils.CHIFFRE_ISDIGIT}$`, "u");
 
   return [
     {
@@ -162,6 +166,11 @@ function groupesEtape1(index, jeux, unicode) {
       nom: "Unicode : espaces (\\s)",
       description: "Classe ESPACE contre str.isspace() de Python.",
       cas: () => testsUnicode(unicode, "espace", (c) => ESPACE_SEUL.test(c)),
+    },
+    {
+      nom: "Unicode : chiffres (isdigit)",
+      description: "Classe CHIFFRE_ISDIGIT contre str.isdigit() de Python (repérage de l'en-tête du PDF).",
+      cas: () => testsUnicode(unicode, "chiffre", (c) => CHIFFRE_ISDIGIT_SEUL.test(c)),
     },
     {
       nom: "Unicode : caractères de mot (\\w)",
@@ -354,6 +363,145 @@ function groupesEtape3(index, jeux) {
 }
 
 // ---------------------------------------------------------------------------
+// Étape 4 — lecture des PDF et lecteur par coordonnées
+// ---------------------------------------------------------------------------
+
+// Écarts de position admis avec pdfplumber.
+// - Horizontalement, le calcul est celui de pdfminer : écart constaté ≤ 0,0005 pt
+//   (PDF.js stocke certaines matrices en précision simple).
+// - Verticalement, PDF.js donne à toutes les polices la même descente
+//   (−0,2119 em) quand pdfminer lit celle de chaque police (−0,207 à −0,212 em) :
+//   l'écart vaut jusqu'à 0,005 × la taille de police (0,09 pt constaté en corps
+//   18). Sans effet sur le regroupement en lignes, dont le seuil est de 3 pt.
+const TOLERANCE_X = 0.05;
+const TOLERANCE_HAUT = 0.25;
+
+const pagesLues = new Map(); // relevé → pages lues par la version JS (lues une seule fois)
+async function pagesDuReleve(chemin) {
+  if (!pagesLues.has(chemin)) {
+    const pdf = await ouvrirPdf(await lireFichier(chemin));
+    pagesLues.set(chemin, await lirePages(pdf));
+  }
+  return pagesLues.get(chemin);
+}
+
+/** Compare les lignes de mots JS à celles de pdfplumber, page par page. */
+function comparerMots(pagesJs, pagesPy, jeu) {
+  const cas = [comparer(pagesJs.length, pagesPy.length, { jeu, controle: "nombre de pages" })];
+  pagesPy.forEach((pagePy, p) => {
+    const lignesJs = pagesJs[p]?.lignes ?? [];
+    const longueur = Math.max(lignesJs.length, pagePy.lignes.length);
+    for (let l = 0; l < longueur; l++) {
+      const js = lignesJs[l] ?? [];
+      const py = pagePy.lignes[l] ?? [];
+      const texteJs = js.map((m) => m.texte).join(" ");
+      const textePy = py.map((m) => m.texte).join(" ");
+      const contexte = { jeu, page: p + 1, ligne: l + 1 };
+      if (texteJs !== textePy) {
+        cas.push(comparer(texteJs, textePy, contexte));
+        continue;
+      }
+      // Même texte : on vérifie la position de chaque mot.
+      const decalages = py.map((m, i) => Math.max(
+        Math.abs(js[i].x0 - m.x0) / TOLERANCE_X,
+        Math.abs(js[i].x1 - m.x1) / TOLERANCE_X,
+        Math.abs(js[i].top - m.top) / TOLERANCE_HAUT,
+        Math.abs(js[i].bottom - m.bottom) / TOLERANCE_HAUT,
+      ));
+      const pire = decalages.indexOf(Math.max(...decalages));
+      const ok = decalages.every((d) => d <= 1);
+      cas.push({
+        statut: ok ? "conforme" : "ecart",
+        detail: {
+          ...contexte,
+          texte: textePy.slice(0, 60),
+          ...(!ok && {
+            mot: py[pire].texte,
+            js: [js[pire].x0, js[pire].x1, js[pire].top].map((v) => v.toFixed(3)),
+            python: [py[pire].x0, py[pire].x1, py[pire].top],
+          }),
+        },
+      });
+    }
+  });
+  return cas;
+}
+
+function groupesEtape4(index, jeux) {
+  const jeuxCoordonnees = jeux.filter((j) => j.nom !== "sib_tableaux");
+  const annee = index.annee_courante;
+  return [
+    {
+      nom: "lirePages : mots et lignes",
+      description:
+        `Mots reconstitués depuis les instructions de dessin de PDF.js, comparés à pdfplumber `
+        + `(texte identique ; position à ${TOLERANCE_X} pt près en largeur, ${TOLERANCE_HAUT} pt en hauteur).`,
+      cas: async () => {
+        const cas = [];
+        for (const jeu of jeux) cas.push(...comparerMots(await pagesDuReleve(jeu.releve), jeu.pages, jeu.nom));
+        return cas;
+      },
+    },
+    {
+      nom: "extraireParCoordonnees",
+      description:
+        "Opérations et totaux de contrôle. Sur l'« Extrait de compte » (sib_tableaux), le lecteur "
+        + "par coordonnées doit ne rien trouver, comme en Python, pour passer la main au lecteur par tableaux.",
+      cas: async () => {
+        const cas = [];
+        for (const jeu of jeux) {
+          const { operations, controles } = extraireParCoordonnees(await pagesDuReleve(jeu.releve));
+          if (jeu.nom === "sib_tableaux") {
+            cas.push(comparer(operations.length, 0, { jeu: jeu.nom, controle: "aucune opération" }));
+            continue;
+          }
+          cas.push(...comparerOperations(operations, jeu.releve_brut, { jeu: jeu.nom }));
+          const trier = (o) => JSON.stringify(Object.fromEntries(Object.entries(o).sort()));
+          cas.push(comparer(trier(controles), trier(jeu.controles), { jeu: jeu.nom, controle: "totaux lus" }));
+        }
+        return cas;
+      },
+    },
+    {
+      nom: "controlerExtraction",
+      description: "Recoupement avec les totaux du relevé, sur les opérations et totaux lus par Python.",
+      cas: () => jeux.map((jeu) => {
+        const { statut, tableau } = controlerExtraction({ operations: jeu.releve_brut, controles: jeu.controles });
+        const enListe = (t) => JSON.stringify(t.map((l) => [l.controle, l.extrait, l.annonce, l.ecart]));
+        return comparer(
+          JSON.stringify([statut, enListe(tableau)]),
+          JSON.stringify([jeu.controle_extraction.statut, enListe(jeu.controle_extraction.tableau)]),
+          { jeu: jeu.nom },
+        );
+      }),
+    },
+    {
+      nom: "Chaîne relevé → rapprochement",
+      description:
+        "extraireRelevePdf puis controlerExtraction, nettoyage et rapprochement, le grand livre "
+        + "étant lu lui aussi par la version JS (réglage par défaut).",
+      cas: async () => {
+        const cas = [];
+        for (const jeu of jeuxCoordonnees) {
+          const releve = await extraireRelevePdf(await lireFichier(jeu.releve));
+          const { statut } = controlerExtraction(releve);
+          cas.push(comparer(statut, jeu.controle_extraction.statut, { jeu: jeu.nom, controle: "statut" }));
+          cas.push(...comparerOperations(nettoyerDonnees(releve.operations, annee), sansRang(jeu.releve_nettoye), {
+            jeu: jeu.nom, phase: "relevé nettoyé",
+          }));
+          if (!jeu.grand_livre) continue;
+          const compta = nettoyerDonnees(chargerGrandLivre(await lireFichier(jeu.grand_livre)), annee);
+          cas.push(...comparerRapprochement(
+            nettoyerDonnees(releve.operations, annee), compta, jeu.rapprochements[0], { jeu: jeu.nom },
+          ));
+        }
+        return cas;
+      },
+    },
+  ];
+}
+
+// ---------------------------------------------------------------------------
 // Affichage
 // ---------------------------------------------------------------------------
 
@@ -437,6 +585,7 @@ async function lancer() {
     ["Étape 1 — outils et similarité", groupesEtape1(index, jeux, unicode)],
     ["Étape 2 — grand livre et nettoyage", groupesEtape2(index, jeux)],
     ["Étape 3 — sens des montants et rapprochement", groupesEtape3(index, jeux)],
+    ["Étape 4 — lecture des PDF et lecteur par coordonnées", groupesEtape4(index, jeux)],
   ]) {
     const resultat = await afficherEtape(titre, groupes);
     for (const cle of Object.keys(bilan)) bilan[cle] += resultat[cle];
