@@ -1,0 +1,61 @@
+# Publie le site statique (dossier web/) sur GitHub Pages.
+#
+# Pas d'étape de construction : le site est publié tel quel. Seule la page de
+# tests de non-régression (web/tests/) est écartée — elle ne sert qu'en local,
+# avec les données de data_entree/ et data_sortie/, qui ne sont jamais
+# committées.
+#
+# Prérequis (une fois) : Settings → Pages → Build and deployment → Source :
+# « GitHub Actions ».
+#
+# Les actions sont épinglées par l'empreinte de leur commit (et non par un
+# numéro de version, qui peut être déplacé) ; la version figure en commentaire.
+
+name: Publication GitHub Pages
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "web/**"
+      - ".github/workflows/pages.yml"
+  workflow_dispatch: # bouton « Run workflow » dans l'onglet Actions
+
+# Droits minimaux : lire le dépôt, publier sur Pages.
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Une seule publication à la fois ; une publication en cours n'est pas annulée.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  publier:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.publication.outputs.page_url }}
+    steps:
+      - name: Récupérer le dépôt
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Préparer le site (web/ sans la page de tests)
+        run: |
+          mkdir _site
+          cp -R web/. _site/
+          rm -rf _site/tests
+
+      - name: Configurer Pages
+        uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
+
+      - name: Empaqueter le site
+        uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
+        with:
+          path: _site
+
+      - name: Publier
+        id: publication
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1

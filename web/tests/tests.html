@@ -2,6 +2,14 @@
 <html lang="fr">
 <head>
   <meta charset="utf-8">
+  <!-- Politique de sécurité : la page ne charge et ne contacte QUE son propre site
+       ('self') — aucun script, style, police, image ni envoi de données vers un
+       autre domaine, même en cas de bug ou de bibliothèque compromise. Pas de
+       script ni de style écrits dans la page, pas d'eval. GitHub Pages ne permet
+       pas de régler les en-têtes HTTP : d'où cette balise, placée en premier. -->
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; font-src 'self'; connect-src 'self'; worker-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
+  <meta name="referrer" content="no-referrer">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Tests de non-régression</title>
   <link rel="icon" href="../favicon.svg" type="image/svg+xml">
