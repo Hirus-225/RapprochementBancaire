@@ -6,6 +6,8 @@ fonctions plutôt que de les recopier — ne jamais dupliquer la logique ailleur
 """
 
 import io
+import math
+import numbers
 import re
 import unicodedata
 from collections import Counter
@@ -335,15 +337,21 @@ def _normaliser(texte):
 
 
 def _en_nombre(texte):
-  """Convertit '1 234,56', '1.234,56' ou '200 000' en float (None si échec)."""
-  brut = (
-      str(texte)
-      .replace(" ", "")
-      .replace(" ", "")
-      .replace("€", "")
-      .replace("XOF", "")
-      .strip()
-  )
+  """Convertit '1 234,56', '1.234,56' ou '200 000' en float (None si échec).
+
+  Une valeur déjà numérique — cellule Excel — est rendue telle quelle. La faire
+  passer par son écriture texte serait faux sans rien lever : `1234.5600000000001`
+  (résidu de calcul) ou `1234.567` perdraient leur point, pris pour un séparateur
+  de milliers, et vaudraient 12345600000000001 ou 1234567.
+  """
+  if isinstance(texte, numbers.Number) and not isinstance(texte, bool):
+    valeur = float(texte)
+    return valeur if math.isfinite(valeur) else None
+
+  # Toutes les espaces sont retirées, y compris les insécables (U+00A0, U+202F)
+  # que les exports comptables français placent entre les milliers : sans quoi
+  # « 1 234,56 » resterait illisible et la ligne disparaîtrait au nettoyage.
+  brut = re.sub(r"\s+", "", str(texte)).replace("€", "").replace("XOF", "")
   if not brut:
     return None
   # Le séparateur décimal est le dernier ',' ou '.' suivi de 1 ou 2 chiffres.
