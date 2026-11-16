@@ -1,35 +1,278 @@
-/* Habillage du site — rempli à l'étape 7 à partir de `_STYLE` (app.py) et de
-   `.streamlit/config.toml`. À ce stade : polices locales et jetons de base, pour
-   vérifier que les fichiers de vendor/fonts/ se chargent. */
+/* Design system « Assistant de rapprochement » — version site statique.
+   Les jetons sont ceux du kit, déclarés jusqu'ici à deux endroits pour
+   Streamlit (`_STYLE` dans app.py et `.streamlit/config.toml`) : ils ne vivent
+   plus qu'ici. Les composants reprennent ceux que Streamlit dessinait. */
 
 @import url("../vendor/fonts/polices.css");
 
+/* ── Jetons du kit ───────────────────────────────────────────────────── */
 :root {
   --font-display: "Fraunces", Georgia, "Times New Roman", serif;
   --font-sans: "IBM Plex Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   --font-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  --text-xs: 12px; --text-sm: 14px; --text-base: 16px; --text-lg: 18px;
+  --text-xl: 22px; --text-2xl: 28px; --text-3xl: 36px;
 
-  --bg: #FFFFFF; --surface: #F0F2F6; --border: #E1E5EC;
-  --text: #31333F; --text-muted: #6B6E7D;
-  --accent: #0E7A63; --success: #177233; --danger: #A1373E;
+  --bg: #FFFFFF; --surface: #F0F2F6; --surface-2: #F7F8FB;
+  --border: #E1E5EC; --border-strong: #C7CDD9;
+  --text: #31333F; --text-muted: #6B6E7D; --text-faint: #9B9EAC;
+  --accent: #0E7A63; --accent-strong: #0A5D4B; --accent-soft: #E2F0EC;
+  --accent-contrast: #FFFFFF;
+
+  --info: #0054A3;    --info-bg: #E9F2FD;    --info-border: #C3DCF7;
+  --success: #177233; --success-bg: #E7F5EB; --success-border: #BFE3C9;
+  --warning: #8A6400; --warning-bg: #FBF3D8; --warning-border: #EBDCA4;
+  --danger: #A1373E;  --danger-bg: #FBEBEC;  --danger-border: #EFC9CC;
+
+  --sp-1: 4px; --sp-2: 8px; --sp-3: 12px; --sp-4: 16px;
+  --sp-5: 24px; --sp-6: 32px; --sp-7: 48px; --sp-8: 64px;
+
+  --r-sm: 4px; --r-md: 8px; --r-lg: 10px; --r-xl: 16px; --r-full: 999px;
+  --shadow-sm: 0 1px 2px rgba(49,51,63,.06);
+  --ring: 0 0 0 3px rgba(14,122,99,.25);
+  --ease: cubic-bezier(.2,.7,.3,1);
+
+  /* Thème clair imposé, comme l'application Streamlit (base = "light"). */
+  color-scheme: light;
 }
 
+/* ── Fondations ──────────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
 body {
-  margin: 0 auto;
-  max-width: 1060px;
-  padding: 32px 16px;
+  margin: 0;
   background: var(--bg);
   color: var(--text);
   font-family: var(--font-sans);
+  font-size: var(--text-base);
+  line-height: 1.6;
 }
-h1 { font-family: var(--font-display); font-weight: 500; }
-code, .mono { font-family: var(--font-mono); }
+h1, h2, h3, h4 { font-family: var(--font-display); font-weight: 500; text-wrap: balance; margin: 0 0 var(--sp-3); }
+h1 { font-size: var(--text-3xl); line-height: 1.2; letter-spacing: -.01em; }
+h2 { font-size: var(--text-2xl); line-height: 1.25; letter-spacing: -.01em; }
+h3 { font-size: var(--text-lg); line-height: 1.3; }
+p { margin: 0 0 var(--sp-4); }
+a { color: var(--accent); text-underline-offset: 3px; }
+a:hover { color: var(--accent-strong); }
+:focus-visible { outline: none; box-shadow: var(--ring); border-radius: var(--r-sm); }
+hr { border: 0; border-top: 1px solid var(--border); margin: var(--sp-5) 0; }
+code, kbd { font-family: var(--font-mono); font-size: .9em; }
+[hidden] { display: none !important; }
+@media (prefers-reduced-motion: reduce) {
+  * { transition: none !important; animation: none !important; }
+}
+/* Masqué à l'écran mais lu par les lecteurs d'écran et utilisable au clavier. */
+.visuellement-masque {
+  position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0;
+  overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+}
 
-/* Liste de vérification de l'étape 0 */
-.verifications { list-style: none; padding: 0; }
-.verifications li {
-  padding: 8px 12px; margin-bottom: 4px;
-  background: var(--surface); border-radius: 8px;
+/* ── Mise en page : barre latérale + colonne principale ──────────────── */
+.app { display: grid; grid-template-columns: 300px minmax(0, 1fr); min-height: 100vh; }
+/* La barre occupe toute la hauteur de la page (fond continu) ; son contenu
+   reste à l'écran pendant le défilement. */
+.barre { background: var(--surface); border-right: 1px solid var(--border); }
+.barre__contenu {
+  position: sticky; top: 0;
+  max-height: 100vh; overflow-y: auto;
+  padding: var(--sp-6) var(--sp-5);
 }
-.verifications .ok::before { content: "✔ "; color: var(--success); }
-.verifications .echec::before { content: "✘ "; color: var(--danger); }
+.contenu { padding: var(--sp-6) var(--sp-6) var(--sp-8); }
+.contenu > section { max-width: 1060px; margin: 0 auto; }
+
+/* Écran étroit : la barre latérale passe au-dessus du contenu. */
+@media (max-width: 860px) {
+  .app { grid-template-columns: minmax(0, 1fr); }
+  .barre { border-right: 0; border-bottom: 1px solid var(--border); }
+  .barre__contenu { position: static; max-height: none; padding: var(--sp-5) var(--sp-4); }
+  .contenu { padding: var(--sp-5) var(--sp-4) var(--sp-7); }
+  h1 { font-size: var(--text-2xl); }
+}
+
+/* ── Barre latérale (.nav du kit) ────────────────────────────────────── */
+.ds-eyebrow {
+  font-family: var(--font-mono); font-size: var(--text-xs);
+  letter-spacing: .14em; text-transform: uppercase; color: var(--accent);
+  margin-bottom: var(--sp-4);
+}
+.nav { display: flex; flex-direction: column; gap: var(--sp-1); }
+.nav a {
+  padding: 7px var(--sp-3); border-radius: var(--r-md);
+  font-size: var(--text-sm); color: var(--text-muted); text-decoration: none;
+  transition: background .15s var(--ease), color .15s var(--ease);
+}
+.nav a:hover { background: var(--bg); color: var(--text); }
+.nav a[aria-current="page"] { background: var(--accent-soft); color: var(--accent); font-weight: 500; }
+.nav-title {
+  font-family: var(--font-mono); font-size: 11px; font-weight: 400;
+  letter-spacing: .12em; text-transform: uppercase; color: var(--text-muted);
+  margin: 0 0 var(--sp-3);
+}
+.hint { font-size: var(--text-xs); color: var(--text-muted); line-height: 1.5; }
+.confidentialite {
+  margin-top: var(--sp-5); padding-top: var(--sp-4); border-top: 1px solid var(--border);
+  font-size: var(--text-xs); color: var(--text-muted);
+}
+
+/* ── Curseurs (.slider) ──────────────────────────────────────────────── */
+.curseur { margin-bottom: var(--sp-4); }
+.curseur__entete { display: flex; justify-content: space-between; align-items: baseline; gap: var(--sp-2); }
+.curseur label { font-size: var(--text-sm); }
+.curseur output {
+  font-family: var(--font-mono); font-size: var(--text-sm); font-weight: 500; color: var(--accent);
+  font-variant-numeric: tabular-nums;
+}
+.curseur input[type="range"] { width: 100%; margin: var(--sp-2) 0 0; accent-color: var(--accent); }
+.curseur__bornes {
+  display: flex; justify-content: space-between;
+  font-family: var(--font-mono); font-size: var(--text-xs); color: var(--text-faint);
+}
+
+/* ── Boutons (.btn) ──────────────────────────────────────────────────── */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: var(--sp-2);
+  font-family: var(--font-sans); font-size: var(--text-sm); font-weight: 500; line-height: 1;
+  padding: 10px var(--sp-4); border: 1px solid transparent; border-radius: var(--r-md);
+  cursor: pointer;
+  transition: background .15s var(--ease), border-color .15s var(--ease), color .15s var(--ease), transform .06s var(--ease);
+}
+.btn:active { transform: translateY(1px); }
+.btn:disabled { opacity: .6; cursor: progress; }
+.btn--primary { background: var(--accent); color: var(--accent-contrast); }
+.btn--primary:hover:not(:disabled) { background: var(--accent-strong); }
+.btn--secondary { background: var(--surface); color: var(--text); }
+.btn--secondary:hover { background: var(--border); }
+/* Le téléchargement du résultat : action secondaire encadrée. */
+.btn--encadre { background: var(--bg); border-color: var(--border-strong); color: var(--text); }
+.btn--encadre:hover { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
+.btn--bloc { display: flex; width: 100%; padding-block: 12px; }
+
+/* ── Zones de dépôt (.dropzone) et pastille de fichier (.file-pill) ───── */
+.depots { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--sp-5); margin: var(--sp-5) 0; }
+@media (max-width: 640px) { .depots { grid-template-columns: minmax(0, 1fr); } }
+.depot h2 { font-size: var(--text-lg); line-height: 1.3; margin-bottom: var(--sp-2); }
+.depot__libelle { font-size: var(--text-sm); margin-bottom: var(--sp-2); }
+.dropzone {
+  display: flex; flex-direction: column; align-items: center; gap: var(--sp-2); text-align: center;
+  background: var(--surface); border: 1px dashed var(--border-strong); border-radius: var(--r-lg);
+  padding: var(--sp-5) var(--sp-4);
+  transition: border-color .15s var(--ease), background .15s var(--ease);
+}
+.dropzone p { margin: 0; font-size: var(--text-sm); }
+.dropzone small { color: var(--text-muted); font-size: var(--text-xs); }
+.dropzone:hover, .dropzone.survol { border-color: var(--accent); background: var(--accent-soft); }
+.dropzone .btn--secondary { background: var(--bg); border-color: var(--border-strong); }
+.file-pill {
+  display: flex; align-items: center; gap: var(--sp-3);
+  background: var(--accent-soft); border-radius: var(--r-md); padding: 6px var(--sp-3); margin-top: var(--sp-2);
+}
+.file-pill__nom {
+  font-family: var(--font-mono); font-size: var(--text-xs); color: var(--accent);
+  overflow-wrap: anywhere; flex: 1;
+}
+.file-pill__taille { font-family: var(--font-mono); font-size: var(--text-xs); color: var(--text-muted); white-space: nowrap; }
+.file-pill__retirer {
+  border: 0; background: transparent; color: var(--text-muted); font-size: 20px; line-height: 1;
+  width: 28px; height: 28px; border-radius: var(--r-sm); cursor: pointer;
+}
+.file-pill__retirer:hover { background: var(--bg); color: var(--danger); }
+.depot__erreur { color: var(--danger); font-size: var(--text-xs); margin: var(--sp-2) 0 0; }
+
+/* ── Messages (.alert) ───────────────────────────────────────────────── */
+.alert {
+  border: 1px solid transparent; border-radius: var(--r-lg);
+  padding: var(--sp-3) var(--sp-4); margin: var(--sp-4) 0; font-size: var(--text-sm);
+}
+.alert--info    { background: var(--info-bg);    color: var(--info);    border-color: var(--info-border); }
+.alert--success { background: var(--success-bg); color: var(--success); border-color: var(--success-border); }
+.alert--warning { background: var(--warning-bg); color: var(--warning); border-color: var(--warning-border); }
+.alert--error   { background: var(--danger-bg);  color: var(--danger);  border-color: var(--danger-border); }
+
+/* Traitement en cours (≈ st.spinner) */
+.progression { display: flex; align-items: center; gap: var(--sp-3); margin: var(--sp-4) 0; font-size: var(--text-sm); color: var(--text-muted); }
+.spinner {
+  width: 18px; height: 18px; border-radius: 50%;
+  border: 2px solid var(--border); border-top-color: var(--accent);
+  animation: tourner .8s linear infinite;
+}
+@keyframes tourner { to { transform: rotate(360deg); } }
+
+/* ── Indicateurs (.metric) ───────────────────────────────────────────── */
+.metriques { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--sp-4); margin: var(--sp-5) 0; }
+@media (max-width: 760px) { .metriques { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.metrique { background: var(--surface); border-radius: var(--r-lg); padding: var(--sp-4); }
+.metrique__libelle {
+  font-size: var(--text-xs); color: var(--text-muted);
+  text-transform: uppercase; letter-spacing: .06em; margin: 0 0 var(--sp-1);
+}
+.metrique__valeur {
+  font-family: var(--font-display); font-size: var(--text-2xl); font-weight: 500;
+  font-variant-numeric: tabular-nums; line-height: 1.15; margin: 0;
+}
+
+/* ── Onglets (.tabs) ─────────────────────────────────────────────────── */
+.onglets [role="tablist"] {
+  display: flex; gap: var(--sp-1); border-bottom: 1px solid var(--border);
+  overflow-x: auto; scrollbar-width: thin;
+}
+.onglets [role="tab"] {
+  flex: none; padding: 9px var(--sp-4); background: none; border: 0;
+  border-bottom: 2px solid transparent; margin-bottom: -1px;
+  font-family: var(--font-sans); font-size: var(--text-sm); color: var(--text-muted);
+  cursor: pointer; transition: color .15s var(--ease), border-color .15s var(--ease);
+}
+.onglets [role="tab"]:hover { color: var(--text); }
+.onglets [role="tab"][aria-selected="true"] { color: var(--accent); font-weight: 500; border-bottom-color: var(--accent); }
+.onglets [role="tabpanel"] { padding-top: var(--sp-4); }
+/* Écran étroit : les onglets passent à la ligne plutôt que de sortir de l'écran. */
+@media (max-width: 760px) {
+  .onglets [role="tablist"] { flex-wrap: wrap; overflow-x: visible; }
+}
+
+/* ── Tableaux (.table-wrap) ──────────────────────────────────────────── */
+.table-wrap {
+  border: 1px solid var(--border); border-radius: var(--r-lg);
+  overflow: auto; max-height: 440px;
+}
+/* Le tableau prend la largeur de son contenu (défilement horizontal dans son
+   cadre au besoin) ; seules les colonnes de libellé passent à la ligne. */
+table.data { width: max-content; min-width: 100%; border-collapse: collapse; font-size: var(--text-sm); }
+table.data th, table.data td {
+  padding: 6px var(--sp-3); border-bottom: 1px solid var(--border);
+  text-align: left; vertical-align: top; white-space: nowrap;
+}
+table.data td.texte { white-space: normal; min-width: 16rem; max-width: 28rem; }
+table.data th {
+  position: sticky; top: 0; z-index: 1;
+  background: var(--surface); font-weight: 500; white-space: nowrap;
+}
+table.data td.nombre { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+table.data td.date { white-space: nowrap; font-variant-numeric: tabular-nums; }
+table.data tr:last-child td { border-bottom: 0; }
+.vide { color: var(--text-muted); font-size: var(--text-sm); }
+
+/* ── Volet dépliant (.card) ──────────────────────────────────────────── */
+details.card {
+  background: var(--bg); border: 1px solid var(--border); border-radius: var(--r-lg);
+  padding: var(--sp-3) var(--sp-4); margin: var(--sp-4) 0;
+}
+details.card summary { font-size: var(--text-sm); font-weight: 500; cursor: pointer; }
+details.card[open] summary { margin-bottom: var(--sp-3); }
+
+/* ── Manuel (Markdown rendu) ─────────────────────────────────────────── */
+.manuel { line-height: 1.65; }
+.manuel h2 { margin-top: var(--sp-7); }
+.manuel h3 { margin-top: var(--sp-5); }
+.manuel ul, .manuel ol { padding-left: var(--sp-5); }
+.manuel li { margin-bottom: var(--sp-1); }
+.manuel table { border-collapse: collapse; margin: var(--sp-4) 0; font-size: var(--text-sm); display: block; overflow-x: auto; }
+.manuel th, .manuel td { border: 1px solid var(--border); padding: 6px var(--sp-3); text-align: left; vertical-align: top; }
+.manuel th { background: var(--surface); font-weight: 500; }
+.manuel pre { background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--r-md); padding: var(--sp-3) var(--sp-4); overflow-x: auto; }
+/* Encadrés « À retenir » / « Attention » (.callout) */
+.manuel blockquote {
+  background: var(--surface-2); border-left: 3px solid var(--accent);
+  border-radius: 0 var(--r-md) var(--r-md) 0;
+  padding: var(--sp-3) var(--sp-4); margin: var(--sp-4) 0;
+}
+.manuel blockquote p:last-child { margin-bottom: 0; }

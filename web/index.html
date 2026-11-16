@@ -4,17 +4,133 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Rapprochement bancaire</title>
+  <meta name="description" content="Confronte un relevé bancaire PDF au grand livre comptable Excel, entièrement dans le navigateur.">
   <link rel="icon" href="favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="css/style.css">
-  <!-- type="module" : main.js peut utiliser `import` (équivalent du `import` Python).
-       Un module ne fonctionne que servi par HTTP : `python3 -m http.server`,
-       pas en ouvrant ce fichier par double-clic (adresse file://). -->
+  <!-- type="module" : main.js utilise `import`. À servir par HTTP
+       (python3 -m http.server), pas en ouvrant ce fichier par double-clic. -->
   <script type="module" src="js/main.js"></script>
 </head>
 <body>
-  <h1>Assistant de rapprochement bancaire</h1>
-  <p>Étape 0 — vérification de l'installation des bibliothèques locales.</p>
-  <ul id="verifications" class="verifications"></ul>
-  <p class="mono" id="polices">Chiffres en IBM Plex Mono : 1 234 567,89</p>
+  <div class="app">
+
+    <!-- Barre latérale : navigation et paramètres (≈ `with st.sidebar:`) -->
+    <aside class="barre">
+     <div class="barre__contenu">
+      <div class="ds-eyebrow">Rapprochement bancaire</div>
+      <nav class="nav" aria-label="Navigation">
+        <a href="#rapprochement" data-page="rapprochement">Rapprochement</a>
+        <a href="#manuel" data-page="manuel">Manuel de procédure</a>
+      </nav>
+      <hr>
+      <p class="hint" id="aide-manuel" hidden>
+        Le mode d'emploi. Revenez au rapprochement par la barre latérale.
+      </p>
+
+      <section id="parametres" aria-labelledby="titre-parametres">
+        <h2 class="nav-title" id="titre-parametres">Paramètres</h2>
+        <p class="hint">
+          Ces réglages ne concernent que le <strong>match partiel</strong> : les opérations de
+          même montant et même date sont toujours rapprochées.
+        </p>
+        <div class="curseur">
+          <div class="curseur__entete">
+            <label for="tolerance">Tolérance sur la date (jours)</label>
+            <output for="tolerance" id="tolerance-valeur">4</output>
+          </div>
+          <input type="range" id="tolerance" min="0" max="15" step="1" value="4"
+                 aria-describedby="tolerance-aide">
+          <div class="curseur__bornes" aria-hidden="true"><span>0</span><span>15</span></div>
+          <p class="hint" id="tolerance-aide">
+            Écart maximal accepté entre la date bancaire et la date comptable.
+          </p>
+        </div>
+        <div class="curseur">
+          <div class="curseur__entete">
+            <label for="score">Similarité minimale des libellés (%)</label>
+            <output for="score" id="score-valeur">80</output>
+          </div>
+          <input type="range" id="score" min="50" max="100" step="1" value="80"
+                 aria-describedby="score-aide">
+          <div class="curseur__bornes" aria-hidden="true"><span>50</span><span>100</span></div>
+          <p class="hint" id="score-aide">
+            Plus la valeur est basse, plus l'outil rapproche — au risque d'appariements erronés.
+          </p>
+        </div>
+      </section>
+
+      <p class="confidentialite">
+        Vos fichiers sont lus dans ce navigateur et ne sont envoyés nulle part.
+      </p>
+     </div>
+    </aside>
+
+    <main class="contenu">
+      <!-- Page « Rapprochement » -->
+      <section id="page-rapprochement" aria-labelledby="titre-rapprochement">
+        <h1 id="titre-rapprochement">Assistant de rapprochement bancaire</h1>
+        <p>
+          Importez votre relevé bancaire au format PDF et votre grand livre comptable en Excel
+          pour lancer le rapprochement automatique.
+        </p>
+
+        <div class="depots">
+          <div class="depot" data-depot="releve" data-extensions=".pdf" data-format="PDF">
+            <h2>1. Relevé Bancaire</h2>
+            <p class="depot__libelle" id="releve-libelle">Déposez le relevé PDF ici</p>
+            <div class="dropzone">
+              <input type="file" accept=".pdf,application/pdf" class="visuellement-masque"
+                     id="releve-fichier" aria-labelledby="releve-libelle">
+              <p>Glissez le fichier ici, ou</p>
+              <button type="button" class="btn btn--secondary" data-parcourir>Parcourir les fichiers</button>
+              <small>Format accepté : PDF</small>
+            </div>
+            <div class="file-pill" hidden>
+              <span class="file-pill__nom"></span>
+              <span class="file-pill__taille"></span>
+              <button type="button" class="file-pill__retirer" aria-label="Retirer le fichier">×</button>
+            </div>
+            <p class="depot__erreur" role="alert" hidden></p>
+          </div>
+
+          <div class="depot" data-depot="grand-livre" data-extensions=".xlsx,.xls" data-format="XLSX, XLS">
+            <h2>2. Grand Livre Comptable</h2>
+            <p class="depot__libelle" id="grand-livre-libelle">Déposez le grand livre Excel ici</p>
+            <div class="dropzone">
+              <input type="file" accept=".xlsx,.xls" class="visuellement-masque"
+                     id="grand-livre-fichier" aria-labelledby="grand-livre-libelle">
+              <p>Glissez le fichier ici, ou</p>
+              <button type="button" class="btn btn--secondary" data-parcourir>Parcourir les fichiers</button>
+              <small>Formats acceptés : XLSX, XLS</small>
+            </div>
+            <div class="file-pill" hidden>
+              <span class="file-pill__nom"></span>
+              <span class="file-pill__taille"></span>
+              <button type="button" class="file-pill__retirer" aria-label="Retirer le fichier">×</button>
+            </div>
+            <p class="depot__erreur" role="alert" hidden></p>
+          </div>
+        </div>
+
+        <div class="alert alert--info" id="attente">
+          Veuillez importer les deux fichiers pour activer le bouton de lancement.
+        </div>
+        <button type="button" class="btn btn--primary btn--bloc" id="lancer" hidden>
+          Lancer le rapprochement
+        </button>
+        <div class="progression" id="progression" role="status" hidden>
+          <span class="spinner" aria-hidden="true"></span> Traitement en cours...
+        </div>
+
+        <!-- Résultats, construits par main.js -->
+        <div id="resultats"></div>
+      </section>
+
+      <!-- Page « Manuel de procédure » : web/manuel.md, rendu par main.js -->
+      <section id="page-manuel" hidden>
+        <article class="manuel" id="manuel" aria-live="polite"></article>
+      </section>
+    </main>
+  </div>
 </body>
 </html>

@@ -1,123 +1,392 @@
-// Étape 0 — vérifie que les bibliothèques de vendor/ se chargent et fonctionnent,
-// sans aucun fichier réel : le PDF et le classeur de test sont fabriqués en mémoire.
-// Ce fichier sera remplacé par l'interface à l'étape 7.
+// Interface du site : équivalent de `_interface()` (app.py).
+//
+// Différence de fond avec Streamlit : Streamlit réexécute tout le script à
+// chaque clic ; ici, la page est construite une fois, puis des fonctions sont
+// attachées aux événements (dépôt d'un fichier, curseur, bouton…).
+//
+// Sécurité : tout texte venant des fichiers de l'utilisateur (libellés…) est
+// inséré avec `textContent`, jamais comme du HTML — un libellé piégé ne peut
+// donc pas devenir du code. Seul le manuel, fichier du site, est rendu en HTML.
 
-// `import * as X from "…"` ≈ `import X` en Python : tout le module sous un nom.
-// `import { a } from "…"` ≈ `from module import a`.
-import * as pdfjsLib from "../vendor/pdfjs/pdf.min.mjs";
-import * as XLSX from "../vendor/sheetjs/xlsx.mjs";
 import { marked } from "../vendor/marked/marked.esm.js";
+import { arrondiPair } from "./outils.js";
+import { chargerGrandLivre } from "./grand-livre.js";
+import { controlerExtraction, extraireRelevePdf } from "./releve.js";
+import {
+  SCORE_MINIMUM, TOLERANCE_JOURS, controlerSensMontants, executerRapprochement, nettoyerDonnees,
+} from "./rapprochement.js";
+import { NOM_FICHIER, classeurResultats, enOctets, telecharger } from "./export.js";
 
-// `import.meta.url` est l'adresse de ce fichier — l'équivalent de `__file__`.
-// On construit les chemins à partir de lui, comme `Path(__file__).parent / …`.
-const ici = (chemin) => new URL(chemin, import.meta.url).href;
+// `$` : raccourci pour querySelector (≈ trouver un élément de la page par sélecteur CSS).
+const $ = (selecteur, racine = document) => racine.querySelector(selecteur);
 
-// PDF.js fait son travail dans un « worker » (fil d'exécution séparé) pour ne pas
-// figer la page : on lui indique où trouver son code, en local.
-pdfjsLib.GlobalWorkerOptions.workerSrc = ici("../vendor/pdfjs/pdf.worker.min.mjs");
+// ---------------------------------------------------------------------------
+// Petits constructeurs d'éléments
+// ---------------------------------------------------------------------------
 
-const liste = document.querySelector("#verifications");
-
-function afficher(nom, reussi, detail) {
-  const li = document.createElement("li");
-  li.className = reussi ? "ok" : "echec";
-  li.textContent = `${nom} — ${detail}`; // `${…}` ≈ f-string Python
-  liste.append(li);
-  console.log(`[étape 0] ${reussi ? "OK" : "ÉCHEC"} ${nom} : ${detail}`);
+/** Crée un élément ; `texte` est inséré comme texte brut (jamais interprété). */
+function element(balise, { classe, texte, attributs = {} } = {}, enfants = []) {
+  const e = document.createElement(balise);
+  if (classe) e.className = classe;
+  if (texte !== undefined) e.textContent = texte;
+  for (const [nom, valeur] of Object.entries(attributs)) e.setAttribute(nom, valeur);
+  e.append(...enfants);
+  return e;
 }
 
-// Fabrique un PDF minimal d'une page contenant « Bonjour 200 000 ».
-function pdfMinimal() {
-  const objets = [
-    "<< /Type /Catalog /Pages 2 0 R >>",
-    "<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
-    "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842]"
-      + " /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>",
-    "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
-  ];
-  const flux = "BT /F1 12 Tf 72 770 Td (Bonjour 200 000) Tj ET";
-  objets.push(`<< /Length ${flux.length} >>\nstream\n${flux}\nendstream`);
+/** Message coloré (≈ st.info / st.success / st.warning / st.error). */
+function alerte(genre, texte) {
+  const role = genre === "error" || genre === "warning" ? "alert" : "status";
+  return element("div", { classe: `alert alert--${genre}`, texte, attributs: { role } });
+}
 
-  let texte = "%PDF-1.4\n";
-  const positions = [];
-  objets.forEach((contenu, i) => {
-    positions.push(texte.length);
-    texte += `${i + 1} 0 obj\n${contenu}\nendobj\n`;
+const formatNombre = new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 2 });
+/** Montant en centimes → « −400 000 » ou « 1 234,56 ». */
+const montant = (centimes) => (centimes == null ? "" : formatNombre.format(centimes / 100));
+
+/**
+ * Tableau de données (≈ st.dataframe). `colonnes` : [{ titre, valeur(ligne),
+ * genre }] ; genre « nombre » aligne à droite, « texte » (libellés) peut passer
+ * à la ligne ; les autres colonnes restent sur une ligne.
+ */
+function tableau(colonnes, lignes) {
+  const entete = element("tr", {}, colonnes.map((c) => element("th", { texte: c.titre, attributs: { scope: "col" } })));
+  const corps = lignes.map((ligne) => element("tr", {}, colonnes.map((c) => {
+    const valeur = c.valeur(ligne);
+    return element("td", { classe: c.genre ?? "", texte: valeur == null ? "" : String(valeur) });
+  })));
+  return element("div", { classe: "table-wrap", attributs: { tabindex: "0" } }, [
+    element("table", { classe: "data" }, [element("thead", {}, [entete]), element("tbody", {}, corps)]),
+  ]);
+}
+
+const colonnesOperations = [
+  { titre: "date", valeur: (o) => o.date, genre: "date" },
+  { titre: "libelle", valeur: (o) => o.libelle, genre: "texte" },
+  { titre: "montant", valeur: (o) => montant(o.montant), genre: "nombre" },
+];
+
+const colonnesRapprochees = [
+  { titre: "ID_Match", valeur: (r) => r.idMatch, genre: "nombre" },
+  { titre: "Type_Match", valeur: (r) => r.typeMatch },
+  { titre: "Date_Banque", valeur: (r) => r.dateBanque, genre: "date" },
+  { titre: "Libelle_Banque", valeur: (r) => r.libelleBanque, genre: "texte" },
+  { titre: "Montant_Banque", valeur: (r) => montant(r.montantBanque), genre: "nombre" },
+  { titre: "Date_Compta", valeur: (r) => r.dateCompta, genre: "date" },
+  { titre: "Libelle_Compta", valeur: (r) => r.libelleCompta, genre: "texte" },
+  { titre: "Montant_Compta", valeur: (r) => montant(r.montantCompta), genre: "nombre" },
+  { titre: "Score_Similarité", valeur: (r) => r.score, genre: "nombre" },
+];
+
+/** Tableau des contrôles : nombres d'opérations en unités, montants en centimes. */
+function tableauControles(lignes) {
+  const valeur = (ligne, v) => (ligne.controle.startsWith("Nombre") ? formatNombre.format(v) : montant(v));
+  return tableau([
+    { titre: "Contrôle", valeur: (l) => l.controle },
+    { titre: "Extrait", valeur: (l) => valeur(l, l.extrait), genre: "nombre" },
+    { titre: "Annoncé par le relevé", valeur: (l) => valeur(l, l.annonce), genre: "nombre" },
+    { titre: "Écart", valeur: (l) => valeur(l, l.ecart), genre: "nombre" },
+  ], lignes);
+}
+
+/** Indicateur chiffré (≈ st.metric). */
+const metrique = (libelle, valeur) => element("div", { classe: "metrique" }, [
+  element("p", { classe: "metrique__libelle", texte: libelle }),
+  element("p", { classe: "metrique__valeur", texte: String(valeur) }),
+]);
+
+/**
+ * Onglets accessibles (≈ st.tabs) : boutons role="tab", flèches gauche/droite
+ * pour passer de l'un à l'autre, un seul panneau visible.
+ */
+function onglets(definitions) {
+  const liste = element("div", { attributs: { role: "tablist", "aria-label": "Résultats" } });
+  const panneaux = [];
+  const boutons = definitions.map(({ titre, contenu }, i) => {
+    const id = `onglet-${i}`;
+    const bouton = element("button", {
+      texte: titre,
+      attributs: { type: "button", role: "tab", id, "aria-controls": `${id}-panneau` },
+    });
+    panneaux.push(element("div", {
+      attributs: { role: "tabpanel", id: `${id}-panneau`, "aria-labelledby": id, tabindex: "0" },
+    }, [contenu]));
+    return bouton;
   });
-  const debutXref = texte.length;
-  texte += `xref\n0 ${objets.length + 1}\n0000000000 65535 f \n`;
-  for (const p of positions) texte += `${String(p).padStart(10, "0")} 00000 n \n`;
-  texte += `trailer\n<< /Size ${objets.length + 1} /Root 1 0 R >>\n`;
-  texte += `startxref\n${debutXref}\n%%EOF\n`;
-  return new TextEncoder().encode(texte); // texte → octets (≈ str.encode())
+
+  function choisir(index) {
+    boutons.forEach((b, i) => {
+      b.setAttribute("aria-selected", String(i === index));
+      b.tabIndex = i === index ? 0 : -1; // seul l'onglet actif reçoit la tabulation
+      panneaux[i].hidden = i !== index;
+    });
+  }
+  boutons.forEach((b, i) => {
+    b.addEventListener("click", () => choisir(i));
+    b.addEventListener("keydown", (evenement) => {
+      const pas = { ArrowRight: 1, ArrowLeft: -1 }[evenement.key];
+      if (!pas) return;
+      const suivant = (i + pas + boutons.length) % boutons.length;
+      choisir(suivant);
+      boutons[suivant].focus();
+    });
+  });
+  liste.append(...boutons);
+  choisir(0);
+  return element("div", { classe: "onglets" }, [liste, ...panneaux]);
 }
 
-// `async` : la fonction peut attendre (`await`) des opérations lentes sans bloquer
-// la page. Chaque `await` ≈ « attends le résultat de cette promesse ».
-async function verifierPdfjs() {
-  const pdf = await pdfjsLib.getDocument({
-    data: pdfMinimal(),
-    cMapUrl: ici("../vendor/pdfjs/cmaps/"),
-    cMapPacked: true,
-    standardFontDataUrl: ici("../vendor/pdfjs/standard_fonts/"),
-  }).promise;
-  const page = await pdf.getPage(1);
-  const contenu = await page.getTextContent();
-  const texte = contenu.items.map((item) => item.str).join("");
-  const attendu = "Bonjour 200 000";
-  afficher(
-    `PDF.js ${pdfjsLib.version}`,
-    texte === attendu,
-    `texte lu : « ${texte} » (attendu « ${attendu} »)`,
-  );
+/** Pourcentage écrit comme `f"{x:.1f}"` en Python (demi arrondi au pair). */
+const pourcentage = (x) => `${(arrondiPair(x * 10) / 10).toFixed(1)} %`;
+
+// ---------------------------------------------------------------------------
+// Dépôt des fichiers
+// ---------------------------------------------------------------------------
+
+const fichiers = { releve: null, "grand-livre": null };
+
+const tailleLisible = (octets) =>
+  octets < 1024 * 1024 ? `${Math.max(1, Math.round(octets / 1024))} Ko` : `${(octets / 1024 / 1024).toFixed(1)} Mo`;
+
+function preparerDepot(depot) {
+  const nom = depot.dataset.depot; // data-depot="releve" → dataset.depot
+  const extensions = depot.dataset.extensions.split(",");
+  const entree = $("input[type=file]", depot);
+  const zone = $(".dropzone", depot);
+  const pastille = $(".file-pill", depot);
+  const erreur = $(".depot__erreur", depot);
+
+  function retenir(fichier) {
+    erreur.hidden = true;
+    if (fichier && !extensions.some((ext) => fichier.name.toLowerCase().endsWith(ext))) {
+      erreur.textContent = `Fichier refusé : format attendu ${depot.dataset.format}.`;
+      erreur.hidden = false;
+      fichier = null;
+    }
+    fichiers[nom] = fichier ?? null;
+    zone.hidden = Boolean(fichiers[nom]);
+    pastille.hidden = !fichiers[nom];
+    if (fichiers[nom]) {
+      $(".file-pill__nom", pastille).textContent = fichier.name;
+      $(".file-pill__taille", pastille).textContent = tailleLisible(fichier.size);
+    }
+    entree.value = ""; // permet de redéposer le même fichier après l'avoir retiré
+    entreesModifiees();
+  }
+
+  $("[data-parcourir]", depot).addEventListener("click", () => entree.click());
+  entree.addEventListener("change", () => retenir(entree.files[0]));
+  $(".file-pill__retirer", pastille).addEventListener("click", () => retenir(null));
+
+  // Glisser-déposer : il faut annuler le comportement par défaut du navigateur
+  // (ouvrir le fichier dans l'onglet) pour recevoir le fichier.
+  zone.addEventListener("dragover", (evenement) => {
+    evenement.preventDefault();
+    zone.classList.add("survol");
+  });
+  zone.addEventListener("dragleave", () => zone.classList.remove("survol"));
+  zone.addEventListener("drop", (evenement) => {
+    evenement.preventDefault();
+    zone.classList.remove("survol");
+    retenir(evenement.dataTransfer.files[0]);
+  });
 }
 
-function verifierSheetjs() {
-  // Écrit un classeur en mémoire puis le relit : aller-retour complet.
-  const feuille = XLSX.utils.aoa_to_sheet([["Date", "Montant"], ["2026-01-30", 1234.56]]);
-  const classeur = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(classeur, feuille, "Test");
-  const octets = XLSX.write(classeur, { type: "array", bookType: "xlsx" });
+// ---------------------------------------------------------------------------
+// Paramètres et état de la page
+// ---------------------------------------------------------------------------
 
-  const relu = XLSX.read(octets, { type: "array" });
-  const lignes = XLSX.utils.sheet_to_json(relu.Sheets.Test, { header: 1 });
-  const montant = lignes[1][1];
-  afficher(
-    `SheetJS ${XLSX.version}`,
-    montant === 1234.56,
-    `aller-retour .xlsx de ${octets.byteLength} octets, montant relu : ${montant}`,
-  );
+const curseurTolerance = $("#tolerance");
+const curseurScore = $("#score");
+curseurTolerance.value = TOLERANCE_JOURS;
+curseurScore.value = SCORE_MINIMUM;
+
+for (const [curseur, sortie] of [[curseurTolerance, $("#tolerance-valeur")], [curseurScore, $("#score-valeur")]]) {
+  sortie.textContent = curseur.value;
+  curseur.addEventListener("input", () => {
+    sortie.textContent = curseur.value;
+    entreesModifiees();
+  });
 }
 
-function verifierMarked() {
-  const html = marked.parse("# Manuel\n\n> À retenir");
-  const reussi = html.includes("<h1>Manuel</h1>") && html.includes("<blockquote>");
-  afficher("marked", reussi, `rendu : ${html.replace(/\s+/g, " ").trim()}`);
+const resultats = $("#resultats");
+
+/**
+ * Un fichier ou un réglage a changé : comme Streamlit, qui réexécute le script
+ * et efface le résultat, on retire un résultat devenu périmé et on n'affiche le
+ * bouton qu'une fois les deux fichiers déposés.
+ */
+function entreesModifiees() {
+  resultats.replaceChildren();
+  const prets = Boolean(fichiers.releve && fichiers["grand-livre"]);
+  $("#attente").hidden = prets;
+  $("#lancer").hidden = !prets;
 }
 
-async function verifierPolices() {
-  const familles = ['500 28px "Fraunces"', '16px "IBM Plex Sans"', '16px "IBM Plex Mono"'];
-  // `Promise.all` attend plusieurs promesses en parallèle (≈ asyncio.gather).
-  await Promise.all(familles.map((f) => document.fonts.load(f)));
-  const manquantes = familles.filter((f) => !document.fonts.check(f));
-  afficher(
-    "Polices locales",
-    manquantes.length === 0,
-    manquantes.length === 0 ? "Fraunces, IBM Plex Sans et Mono chargées" : `absentes : ${manquantes.join(", ")}`,
-  );
+// ---------------------------------------------------------------------------
+// Rapprochement
+// ---------------------------------------------------------------------------
+
+/** Recoupement avec les totaux du relevé (`_afficher_controles`). */
+function afficherControles({ statut, tableau: lignes }) {
+  if (statut === null) {
+    return [alerte("warning",
+      "Ce relevé ne comporte pas de totaux de contrôle exploitables :"
+      + " l'extraction n'a pas pu être vérifiée automatiquement. Recoupez le"
+      + " nombre d'opérations et les totaux avant d'exploiter le résultat.")];
+  }
+  if (statut) {
+    return [element("details", { classe: "card" }, [
+      element("summary", { texte: "Extraction vérifiée sur les totaux du relevé" }),
+      tableauControles(lignes),
+    ])];
+  }
+  return [
+    alerte("error",
+      "L'extraction ne correspond pas aux totaux imprimés sur le relevé :"
+      + " des opérations ont été mal lues ou omises. Le rapprochement ci-dessous"
+      + " n'est pas fiable."),
+    tableauControles(lignes),
+  ];
 }
 
-// Chaque vérification est isolée : l'échec de l'une n'empêche pas les autres.
-// try/catch ≈ try/except ; `erreur.message` ≈ str(e).
-for (const [nom, verification] of [
-  ["PDF.js", verifierPdfjs],
-  ["SheetJS", verifierSheetjs],
-  ["marked", verifierMarked],
-  ["Polices", verifierPolices],
-]) {
+/** Laisse au navigateur le temps de dessiner (le sablier) avant un calcul long. */
+const laisserDessiner = () => new Promise((fin) => requestAnimationFrame(() => setTimeout(fin, 0)));
+
+async function lancer() {
+  const bouton = $("#lancer");
+  const progression = $("#progression");
+  resultats.replaceChildren();
+  bouton.disabled = true;
+  progression.hidden = false;
+  await laisserDessiner();
+
+  const afficher = (...elements) => resultats.append(...elements);
   try {
-    await verification();
+    // `file.arrayBuffer()` lit le fichier déposé, dans le navigateur (≈ uploaded.getvalue()).
+    const [octetsReleve, octetsGrandLivre] = await Promise.all([
+      fichiers.releve.arrayBuffer(),
+      fichiers["grand-livre"].arrayBuffer(),
+    ]);
+    const releve = await extraireRelevePdf(new Uint8Array(octetsReleve));
+    const comptaBrut = chargerGrandLivre(new Uint8Array(octetsGrandLivre));
+    const controle = controlerExtraction(releve);
+
+    const banque = nettoyerDonnees(releve.operations);
+    const compta = nettoyerDonnees(comptaBrut);
+
+    if (banque.length === 0) {
+      afficher(
+        alerte("error",
+          "Aucune opération exploitable dans le relevé PDF après nettoyage."
+          + " Aperçu de l'extraction brute :"),
+        tableau([
+          { titre: "date", valeur: (o) => o.date, genre: "date" },
+          { titre: "libelle", valeur: (o) => o.libelle, genre: "texte" },
+          { titre: "montant", valeur: (o) => montant(o.montant), genre: "nombre" },
+        ], releve.operations),
+      );
+      return;
+    }
+    if (compta.length === 0) {
+      afficher(alerte("error", "Aucune écriture exploitable dans le grand livre après nettoyage."));
+      return;
+    }
+
+    afficher(...afficherControles(controle));
+
+    const alerteSens = controlerSensMontants(banque, compta);
+    if (alerteSens) afficher(alerte("warning", alerteSens));
+
+    const resultat = executerRapprochement(
+      banque, compta, Number(curseurTolerance.value), Number(curseurScore.value),
+    );
+    const { rapprochees, manquantsCompta, manquantsBanque } = resultat;
+
+    afficher(
+      alerte("success", "Rapprochement effectué avec succès !"),
+      element("div", { classe: "metriques" }, [
+        metrique("Opérations Rapprochées", rapprochees.length),
+        metrique("Manquants en Compta", manquantsCompta.length),
+        metrique("Manquants en Banque", manquantsBanque.length),
+        metrique("Taux de rapprochement", pourcentage((rapprochees.length / banque.length) * 100)),
+      ]),
+      onglets([
+        { titre: `Rapprochées (${rapprochees.length})`, contenu: tableau(colonnesRapprochees, rapprochees) },
+        {
+          titre: `Dans la banque, absentes en compta (${manquantsCompta.length})`,
+          contenu: tableau(colonnesOperations, manquantsCompta),
+        },
+        {
+          titre: `En compta, absentes de la banque (${manquantsBanque.length})`,
+          contenu: tableau(colonnesOperations, manquantsBanque),
+        },
+      ]),
+      element("hr"),
+    );
+
+    const octets = enOctets(classeurResultats(resultat, controle));
+    const telechargement = element("button", {
+      classe: "btn btn--encadre btn--bloc",
+      texte: "Télécharger le résultat (Excel)",
+      attributs: { type: "button" },
+    });
+    telechargement.addEventListener("click", () => telecharger(octets, NOM_FICHIER));
+    afficher(telechargement);
   } catch (erreur) {
-    afficher(nom, false, `erreur : ${erreur.message}`);
+    console.error(erreur);
+    afficher(alerte("error", `Une erreur est survenue lors du traitement : ${erreur.message}`));
+  } finally {
+    bouton.disabled = false;
+    progression.hidden = true;
   }
 }
+
+// ---------------------------------------------------------------------------
+// Navigation entre les deux pages et manuel
+// ---------------------------------------------------------------------------
+
+let manuelCharge = false;
+
+async function chargerManuel() {
+  if (manuelCharge) return;
+  const conteneur = $("#manuel");
+  try {
+    const reponse = await fetch(new URL("../manuel.md", import.meta.url));
+    if (!reponse.ok) throw new Error(`HTTP ${reponse.status}`);
+    // Le manuel est un fichier du site (pas une donnée de l'utilisateur) :
+    // on peut l'insérer comme HTML.
+    conteneur.innerHTML = marked.parse(await reponse.text());
+    manuelCharge = true;
+  } catch {
+    conteneur.replaceChildren(alerte("error",
+      "Le manuel de procédure est introuvable. Vérifiez que le fichier"
+      + " manuel.md est bien livré avec le site."));
+  }
+}
+
+/** Affiche la page désignée par l'adresse (#rapprochement ou #manuel). */
+function afficherPage() {
+  const page = location.hash === "#manuel" ? "manuel" : "rapprochement";
+  $("#page-rapprochement").hidden = page !== "rapprochement";
+  $("#page-manuel").hidden = page !== "manuel";
+  $("#parametres").hidden = page !== "rapprochement";
+  $("#aide-manuel").hidden = page !== "manuel";
+  for (const lien of document.querySelectorAll(".nav a")) {
+    if (lien.dataset.page === page) lien.setAttribute("aria-current", "page");
+    else lien.removeAttribute("aria-current");
+  }
+  document.title = page === "manuel" ? "Manuel de procédure — Rapprochement bancaire" : "Rapprochement bancaire";
+  window.scrollTo(0, 0); // chaque page s'ouvre en haut, pas à la position de la précédente
+  if (page === "manuel") chargerManuel();
+}
+
+// ---------------------------------------------------------------------------
+// Démarrage
+// ---------------------------------------------------------------------------
+
+document.querySelectorAll(".depot").forEach(preparerDepot);
+$("#lancer").addEventListener("click", lancer);
+window.addEventListener("hashchange", afficherPage); // boutons Précédent / Suivant compris
+afficherPage();
+entreesModifiees();
