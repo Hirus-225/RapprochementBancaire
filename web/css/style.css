@@ -1,0 +1,35 @@
+/* Habillage du site — rempli à l'étape 7 à partir de `_STYLE` (app.py) et de
+   `.streamlit/config.toml`. À ce stade : polices locales et jetons de base, pour
+   vérifier que les fichiers de vendor/fonts/ se chargent. */
+
+@import url("../vendor/fonts/polices.css");
+
+:root {
+  --font-display: "Fraunces", Georgia, "Times New Roman", serif;
+  --font-sans: "IBM Plex Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  --bg: #FFFFFF; --surface: #F0F2F6; --border: #E1E5EC;
+  --text: #31333F; --text-muted: #6B6E7D;
+  --accent: #0E7A63; --success: #177233; --danger: #A1373E;
+}
+
+body {
+  margin: 0 auto;
+  max-width: 1060px;
+  padding: 32px 16px;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-sans);
+}
+h1 { font-family: var(--font-display); font-weight: 500; }
+code, .mono { font-family: var(--font-mono); }
+
+/* Liste de vérification de l'étape 0 */
+.verifications { list-style: none; padding: 0; }
+.verifications li {
+  padding: 8px 12px; margin-bottom: 4px;
+  background: var(--surface); border-radius: 8px;
+}
+.verifications .ok::before { content: "✔ "; color: var(--success); }
+.verifications .echec::before { content: "✘ "; color: var(--danger); }

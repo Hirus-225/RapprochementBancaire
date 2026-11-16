@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Rapprochement bancaire</title>
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="css/style.css">
+  <!-- type="module" : main.js peut utiliser `import` (équivalent du `import` Python).
+       Un module ne fonctionne que servi par HTTP : `python3 -m http.server`,
+       pas en ouvrant ce fichier par double-clic (adresse file://). -->
+  <script type="module" src="js/main.js"></script>
+</head>
+<body>
+  <h1>Assistant de rapprochement bancaire</h1>
+  <p>Étape 0 — vérification de l'installation des bibliothèques locales.</p>
+  <ul id="verifications" class="verifications"></ul>
+  <p class="mono" id="polices">Chiffres en IBM Plex Mono : 1 234 567,89</p>
+</body>
+</html>

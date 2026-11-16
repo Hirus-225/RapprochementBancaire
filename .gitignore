@@ -80,4 +80,5 @@ desktop.ini
 # sur GitHub. Le CLI de test et la doc interne restent locaux.
 # ---------------------------------------------------------------------------
 script_rapprochement.py
+script_reference_js.py
 CLAUDE.md
