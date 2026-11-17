@@ -9,7 +9,7 @@ fichiers ci-dessous **et** mettre à jour ce tableau.
 | `pdfjs/` | PDF.js (Mozilla) — lecture des PDF | 6.4.299 | paquet npm `pdfjs-dist` | `build/pdf.min.mjs`, `build/pdf.worker.min.mjs`, `cmaps/`, `standard_fonts/`, `LICENSE` (Apache-2.0) |
 | `sheetjs/` | SheetJS Community Edition — lecture et écriture Excel | 0.20.3 | `https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz` | `xlsx.mjs`, `LICENSE` (Apache-2.0) |
 | `marked/` | marked — rendu du manuel Markdown | 18.1.2 | paquet npm `marked` | `lib/marked.esm.js`, `LICENSE` (MIT) |
-| `fonts/` | Fraunces (variable, axes opsz + wght), IBM Plex Sans 400/500/600, IBM Plex Mono 400/500 — sous-ensemble *latin* | 5.3.0 | paquets npm `@fontsource-variable/fraunces`, `@fontsource/ibm-plex-sans`, `@fontsource/ibm-plex-mono` | fichiers `.woff2`, `polices.css`, licences OFL-1.1 |
+| `fonts/` | Bricolage Grotesque (variable, axes opsz 12–96 + wght 200–800) et Manrope (variable, axe wght 200–800) — sous-ensemble *latin* | 5.3.0 | paquets npm `@fontsource-variable/bricolage-grotesque` et `@fontsource-variable/manrope`, via `https://cdn.jsdelivr.net/npm/` | `files/bricolage-grotesque-latin-opsz-normal.woff2`, `files/manrope-latin-wght-normal.woff2`, `LICENSE` de chaque paquet (OFL-1.1, renommés `LICENCE-*.txt`) ; `polices.css` écrit à la main |
 
 Points d'attention :
 
