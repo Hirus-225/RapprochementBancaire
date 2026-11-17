@@ -1,6 +1,6 @@
 # Manuel de procédure — Rapprochement bancaire
 
-**Version 2.0 — 16 novembre 2026**
+**Version 2.1 — 17 novembre 2026**
 
 Confronter un relevé bancaire à votre grand livre comptable et obtenir, en un
 clic, la liste des opérations rapprochées et des écarts à traiter.
@@ -79,11 +79,16 @@ Rendez-vous à l'adresse de l'application :
 https://charleszogoue.ci/RapprochementBancaire/
 ```
 
-Ajoutez-la à vos favoris pour la retrouver facilement. La page « Assistant de
-rapprochement bancaire » s'affiche : deux zones de dépôt de fichiers au centre,
-et à gauche un panneau avec la navigation (**Rapprochement**, **Manuel de
-procédure**) et les paramètres. Sur un écran étroit, ce panneau passe au-dessus
-de la page.
+Ajoutez-la à vos favoris pour la retrouver facilement. La page « Rapprochement
+bancaire » se lit de haut en bas :
+
+- un **bandeau bleu marine**, avec la navigation en haut à droite
+  (**Rapprochement**, **Manuel de procédure**) ;
+- la section **Fichiers** : les deux zones de dépôt ;
+- la bande grise **Réglages** : les deux curseurs et le bouton de lancement ;
+- la section **Résultat**, qui n'apparaît qu'après un rapprochement.
+
+Sur un écran étroit, tout passe sur une seule colonne.
 
 ---
 
@@ -93,32 +98,37 @@ Trois gestes suffisent ; le réglage des curseurs est facultatif.
 
 ### Étape 1 — Déposer le relevé bancaire
 
-Sous **1. Relevé Bancaire**, glissez le PDF dans la zone de dépôt, ou cliquez
-sur **Parcourir les fichiers** pour le sélectionner. Le nom du fichier s'affiche
-alors dans une pastille verte ; la croix **×** permet de le retirer.
+Dans la section **Fichiers**, sous **Relevé bancaire** (repère *PDF*), glissez
+le PDF dans la zone de dépôt, ou cliquez n'importe où dans cette zone pour le
+choisir parmi vos fichiers. Le nom et la taille du fichier s'affichent alors, et
+la mention **En attente** devient **Prêt**. Le lien **Retirer** permet de
+l'enlever.
 
 ### Étape 2 — Déposer le grand livre
 
-Sous **2. Grand Livre Comptable**, déposez le fichier Excel de la même façon.
-Tant que les deux fichiers ne sont pas déposés, un message vous le rappelle et
-le bouton de lancement n'apparaît pas.
+Sous **Grand livre comptable** (repère *Excel*), déposez le fichier de la même
+façon. Au clavier, la touche Tab atteint chaque zone de dépôt, et Espace ouvre
+le choix du fichier.
 
-### Étape 3 — Ajuster les paramètres (facultatif)
+### Étape 3 — Ajuster les réglages (facultatif)
 
-Dans le panneau de gauche, deux curseurs affinent l'appariement :
+Dans la bande **Réglages**, deux curseurs affinent l'appariement :
 
 | Réglage | Effet | Défaut |
 |---|---|---|
-| **Tolérance sur la date (jours)** | Écart de date maximal accepté entre banque et compta. | 4 jours |
-| **Similarité minimale des libellés (%)** | Plus la valeur est basse, plus l'outil rapproche — au risque d'appariements erronés. | 80 % |
+| **Tolérance sur la date** | Écart de date maximal accepté entre banque et compta. | 4 jours |
+| **Similarité des libellés** | Plus la valeur est basse, plus l'outil rapproche, au risque d'appariements erronés. | 80 % |
 
 Ces deux réglages n'influencent **que le rapprochement partiel** (voir §7) ;
 laissez-les tels quels en cas de doute.
 
 ### Étape 4 — Lancer
 
-Cliquez sur **Lancer le rapprochement**. Le message « Traitement en cours… »
-s'affiche quelques secondes.
+À droite des curseurs, un message indique où vous en êtes (« Il manque le
+relevé bancaire. », « Les deux fichiers sont prêts. »…). Le bouton **Lancer le
+rapprochement** reste grisé tant qu'il manque un fichier. Cliquez dessus : le
+message « Traitement en cours… » s'affiche quelques secondes, puis la page
+descend jusqu'au résultat.
 
 > **Changer un fichier ou un réglage efface le résultat.** Le résultat affiché
 > correspond toujours aux fichiers et aux réglages du moment : si vous en
@@ -128,30 +138,51 @@ s'affiche quelques secondes.
 
 ## 5. Lire l'écran de résultats
 
-Le contrôle de l'extraction d'abord, puis les chiffres clés, le détail dans les
-onglets et le classeur à télécharger en bas.
+La section **Résultat** présente d'abord le contrôle de l'extraction (§6),
+puis trois chiffres clés, et enfin le détail ligne à ligne dans des onglets.
 
-### Les quatre indicateurs
+### Les trois chiffres clés
 
-| Indicateur | Ce qu'il compte |
+| Bloc | Ce qu'il indique |
 |---|---|
-| **Opérations rapprochées** | Opérations appariées entre les deux sources. |
-| **Manquants en compta** | Présentes en banque, introuvables en comptabilité. |
-| **Manquants en banque** | Présentes en compta, introuvables sur le relevé. |
-| **Taux de rapprochement** | Part des opérations bancaires appariées. |
+| **Taux de rapprochement** | Part des opérations bancaires appariées. La barre colorée et sa légende détaillent la répartition : *Parfait*, *N° de chèque*, *Partiel* et *Non rapprochées*. |
+| **À saisir en comptabilité** | Opérations du relevé absentes du grand livre, avec leur **solde net** en F CFA. |
+| **En attente à la banque** | Écritures du grand livre absentes du relevé, avec leur **solde net** en F CFA. |
+
+Sous chacun des deux derniers blocs, un lien (**Voir ces opérations**, **Voir
+ces écritures**) ouvre directement l'onglet correspondant.
 
 ### Les trois onglets
 
-Ils reprennent le détail ligne à ligne : **Rapprochées**, **Dans la banque,
-absentes en compta** et **En compta, absentes de la banque**. Un tableau trop
-large pour l'écran défile horizontalement dans son cadre.
+Ils reprennent le détail ligne à ligne : **Rapprochées**, **À saisir en
+comptabilité** et **En attente à la banque**. Le nombre de lignes figure à côté
+de chaque titre. Dans l'onglet **Rapprochées**, chaque ligne montre côté
+**Banque** la date, le libellé et le montant, côté **Comptabilité** la date et
+le libellé, puis la similarité des libellés (sur 100). Quand les deux dates
+diffèrent, l'écart est indiqué sous la date comptable (par exemple « 4 j
+avant » : la compta a daté l'opération 4 jours avant la banque). Les montants
+positifs sont en vert. Les dates s'affichent au format JJ/MM/AAAA.
+
+Au-dessus du tableau :
+
+- le champ **Filtrer par libellé ou montant** ne garde que les lignes qui
+  contiennent le texte ou le montant saisi (les espaces sont ignorées :
+  `186400` trouve `186 400`) ;
+- dans l'onglet **Rapprochées**, les boutons **Tous**, **Parfait**, **N° de
+  chèque** et **Partiel** filtrent selon le type de correspondance ;
+- un compteur indique combien de lignes sont affichées (« 27 sur 56 lignes »).
+
+Ces filtres ne servent qu'à l'écran : ils ne modifient pas le classeur Excel.
 
 ### Le classeur Excel
 
-Le bouton **Télécharger le résultat (Excel)** enregistre
-`resultat_rapprochement.xlsx` dans votre dossier de téléchargements, avec une
-feuille par onglet plus, le cas échéant, une feuille **Contrôles extraction**.
-C'est ce fichier que vous conservez comme pièce de rapprochement.
+Le bouton **Télécharger le classeur Excel**, en haut de la section Résultat,
+enregistre `resultat_rapprochement.xlsx` dans votre dossier de
+téléchargements. Il contient trois feuilles, **Opérations rapprochées**,
+**Manquants en compta** et **Manquants en banque**, et, le cas échéant, une
+quatrième feuille **Contrôles extraction**. Il reprend toutes les lignes,
+quels que soient les filtres de l'écran. C'est ce fichier que vous conservez
+comme pièce de rapprochement.
 
 ---
 
@@ -166,13 +197,13 @@ Trois situations possibles :
 
 | Affichage | Ce que cela veut dire | Ce qu'il faut faire |
 |---|---|---|
-| **Volet « Extraction vérifiée sur les totaux du relevé »** | Les totaux lus correspondent à ceux du relevé. Dépliez le volet : le tableau de contrôle (colonnes *Extrait*, *Annoncé par le relevé*, *Écart*) affiche un écart nul partout. | Vous pouvez exploiter le résultat en confiance. |
-| **Message rouge « L'extraction ne correspond pas… »** | Les totaux ne concordent pas : des opérations ont été mal lues ou omises. | N'exploitez pas le rapprochement et signalez le relevé au support. |
-| **Message orange « Ce relevé ne comporte pas de totaux de contrôle exploitables… »** | L'extraction n'a pas pu être vérifiée automatiquement. | Le résultat peut être bon, mais recoupez vous-même le nombre d'opérations et les totaux avant de le valider. |
+| **Coche verte « Extraction vérifiée. Les 5 contrôles sur les totaux du relevé sont à écart nul. »** (3 contrôles sur certains relevés) | Les totaux lus correspondent à ceux du relevé. Cliquez sur **Voir les contrôles** : le tableau (colonnes *Extrait*, *Annoncé par le relevé*, *Écart*) affiche un écart nul partout. | Vous pouvez exploiter le résultat en confiance. |
+| **Message sur fond rouge « L'extraction ne correspond pas… »**, suivi du tableau des contrôles | Les totaux ne concordent pas : des opérations ont été mal lues ou omises. La colonne *Écart* montre lesquels. | N'exploitez pas le rapprochement et signalez le relevé au support. |
+| **Message sur fond orangé « Ce relevé ne comporte pas de totaux de contrôle exploitables… »** | L'extraction n'a pas pu être vérifiée automatiquement. | Le résultat peut être bon, mais recoupez vous-même le nombre d'opérations et les totaux avant de le valider. |
 
 ### Alerte sur le sens des montants
 
-Un message signalant une **convention Débit/Crédit** inhabituelle veut dire que
+Un message sur fond orangé signalant une **convention Débit/Crédit** inhabituelle veut dire que
 les montants concorderaient bien mieux en inversant le signe de la comptabilité.
 C'est le signe d'une colonne Débit/Crédit inversée dans l'extraction du grand
 livre : corrigez l'export avant d'exploiter le résultat.
@@ -191,14 +222,14 @@ relevé, ou différence à corriger dans un des deux systèmes.
 
 ### Comment l'outil apparie — trois niveaux
 
-La colonne **Type_Match** du résultat indique comment chaque opération a été
-rapprochée :
+La colonne **Type** de l'onglet Rapprochées (colonne **Type_Match** du classeur
+Excel) indique comment chaque opération a été rapprochée :
 
-| Type de correspondance | Règle appliquée |
-|---|---|
-| **Parfait** | Même montant et même date. |
-| **Numéro de chèque** | Même montant et même numéro de chèque, quelle que soit la date — la banque date l'encaissement, la compta l'émission. |
-| **Partiel** | Même montant, date proche (dans la tolérance) et libellés suffisamment ressemblants. |
+| À l'écran | Dans le classeur | Règle appliquée |
+|---|---|---|
+| **Parfait** | Parfait | Même montant et même date. |
+| **N° de chèque** | Numéro de chèque | Même montant et même numéro de chèque, quelle que soit la date — la banque date l'encaissement, la compta l'émission. |
+| **Partiel** | Partiel (Tolérance date & libellé) | Même montant, date proche (dans la tolérance) et libellés suffisamment ressemblants. |
 
 > **Marche à suivre.** Pour chaque ligne restée non rapprochée, cherchez sa
 > contrepartie dans l'autre feuille (souvent même montant, à une date ou un
@@ -248,7 +279,7 @@ ce problème.
 ### Un relevé sans totaux n'est pas vérifié automatiquement
 
 Sur ce type de relevé, le garde-fou d'extraction ne peut pas se prononcer (§6,
-message orange) : le recoupement manuel vous revient.
+message sur fond orangé) : le recoupement manuel vous revient.
 
 ---
 
@@ -256,10 +287,10 @@ message orange) : le recoupement manuel vous revient.
 
 | Ce que vous constatez | Cause probable et conduite à tenir |
 |---|---|
-| Le bouton **Lancer le rapprochement** n'apparaît pas | Un des deux fichiers n'est pas déposé. Vérifiez que les deux pastilles vertes sont affichées. |
+| Le bouton **Lancer le rapprochement** reste grisé | Un des deux fichiers n'est pas déposé : le message au-dessus du bouton indique lequel. Les deux zones doivent afficher **Prêt**. |
 | « Fichier refusé : format attendu… » | Le fichier déposé n'a pas la bonne extension : un PDF pour le relevé, un `.xlsx` ou `.xls` pour le grand livre. |
 | « Aucune opération n'a pu être extraite » | Le PDF n'expose pas de colonnes Débit/Crédit lisibles (relevé scanné en simple image, sans texte, ou format inhabituel). Fournissez le PDF d'origine de la banque. |
-| Message rouge sur l'extraction | Extraction incomplète ou erronée. N'exploitez pas le résultat ; transmettez le relevé au support. |
+| Message sur fond rouge à propos de l'extraction | Extraction incomplète ou erronée. N'exploitez pas le résultat ; transmettez le relevé au support. |
 | Taux de rapprochement très bas | Souvent une inversion Débit/Crédit à l'export du grand livre (voir l'alerte de sens), ou une période / un compte qui ne correspondent pas au relevé. |
 | « Colonnes 'date' ou 'libellé' introuvables » | Le grand livre ne contient pas les colonnes attendues, ou ses intitulés ne sont pas sur la première ligne. Renommez-les clairement (date, libellé, débit, crédit) et ré-exportez. |
 | Le résultat a disparu | Un fichier ou un réglage a été modifié après le lancement (§4) : relancez le rapprochement. |
@@ -271,5 +302,6 @@ message orange) : le recoupement manuel vous revient.
 
 | Version | Date | Changement |
 |---|---|---|
+| 2.1 | 17/11/2026 | Nouvel habillage de l'écran, sur une seule colonne : bandeau, sections Fichiers, Réglages et Résultat ; nouveaux noms des onglets et du bouton de téléchargement ; filtre et types de correspondance au-dessus du tableau. Le classeur Excel ne change pas. |
 | 2.0 | 16/11/2026 | Nouvelle version de l'outil, en site web : les fichiers sont traités dans le navigateur et ne sont plus envoyés à un serveur. Nouvelle adresse, nouveaux libellés de l'écran. |
 | 1.0 | 17/09/2026 | Première rédaction, reprise du manuel HTML embarqué dans l'application. |
