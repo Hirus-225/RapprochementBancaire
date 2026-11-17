@@ -1,5 +1,8 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
-  <!-- Icône d'onglet : façade de banque, couleur d'accent du kit (--accent). -->
-  <rect width="32" height="32" rx="7" fill="#0E7A63"/>
-  <path d="M16 6 6 11v2h20v-2z M8 14h3v8H8z M14.5 14h3v8h-3z M21 14h3v8h-3z M6 23h20v3H6z" fill="#FFFFFF"/>
+  <!-- Icône d'onglet : façade de banque aux couleurs du portfolio
+       (fond marine, colonnes blanches, socle ambre comme le filet du bandeau).
+       Pas de double tiret dans ce commentaire : le XML l'interdit. -->
+  <rect width="32" height="32" rx="7" fill="#123249"/>
+  <path d="M16 6 6 11v2h20v-2z M8 14h3v8H8z M14.5 14h3v8h-3z M21 14h3v8h-3z" fill="#FFFFFF"/>
+  <path d="M6 23h20v3H6z" fill="#F2A31B"/>
 </svg>
