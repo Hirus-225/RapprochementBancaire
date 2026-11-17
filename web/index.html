@@ -19,126 +19,201 @@
        (python3 -m http.server), pas en ouvrant ce fichier par double-clic. -->
   <script type="module" src="js/main.js"></script>
 </head>
-<body>
-  <div class="app">
+<body data-page="rapprochement">
 
-    <!-- Barre latérale : navigation et paramètres -->
-    <aside class="barre">
-     <div class="barre__contenu">
-      <div class="ds-eyebrow">Rapprochement bancaire</div>
-      <nav class="nav" aria-label="Navigation">
-        <a href="#rapprochement" data-page="rapprochement">Rapprochement</a>
-        <a href="#manuel" data-page="manuel">Manuel de procédure</a>
-      </nav>
-      <hr>
-      <p class="hint" id="aide-manuel" hidden>
-        Le mode d'emploi. Revenez au rapprochement par la barre latérale.
-      </p>
-
-      <section id="parametres" aria-labelledby="titre-parametres">
-        <h2 class="nav-title" id="titre-parametres">Paramètres</h2>
-        <p class="hint">
-          Ces réglages ne concernent que le <strong>match partiel</strong> : les opérations de
-          même montant et même date sont toujours rapprochées.
-        </p>
-        <div class="curseur">
-          <div class="curseur__entete">
-            <label for="tolerance">Tolérance sur la date (jours)</label>
-            <output for="tolerance" id="tolerance-valeur">4</output>
-          </div>
-          <input type="range" id="tolerance" min="0" max="15" step="1" value="4"
-                 aria-describedby="tolerance-aide">
-          <div class="curseur__bornes" aria-hidden="true"><span>0</span><span>15</span></div>
-          <p class="hint" id="tolerance-aide">
-            Écart maximal accepté entre la date bancaire et la date comptable.
+  <!-- Bandeau marine : marque, navigation, titre de la page. Sur la page du
+       manuel, l'accroche et l'encadré sont masqués (version réduite). -->
+  <header class="bandeau">
+    <div class="cadre">
+      <div class="barre-haut">
+        <a class="marque" href="#rapprochement">Rapprochement <b>Facile</b></a>
+        <nav class="navigation" aria-label="Navigation">
+          <a href="#rapprochement" data-page="rapprochement">Rapprochement</a>
+          <a href="#manuel" data-page="manuel">Manuel de procédure</a>
+          <a href="https://charleszogoue.ci" rel="noopener">charleszogoue.ci</a>
+        </nav>
+      </div>
+      <h1 id="titre-rapprochement">Rapprochement<br>bancaire</h1>
+      <h1 id="titre-manuel" hidden>Manuel de procédure</h1>
+      <div class="accroche" id="accroche">
+        <div>
+          <p class="accroche__phrase">Le relevé d'un côté, le grand livre de l'autre.</p>
+          <p class="accroche__texte">
+            Déposez le relevé PDF de la banque et le grand livre Excel du compte. L'outil
+            apparie les opérations et isole celles qui restent à justifier.
           </p>
         </div>
-        <div class="curseur">
-          <div class="curseur__entete">
-            <label for="score">Similarité minimale des libellés (%)</label>
-            <output for="score" id="score-valeur">80</output>
-          </div>
-          <input type="range" id="score" min="50" max="100" step="1" value="80"
-                 aria-describedby="score-aide">
-          <div class="curseur__bornes" aria-hidden="true"><span>50</span><span>100</span></div>
-          <p class="hint" id="score-aide">
-            Plus la valeur est basse, plus l'outil rapproche — au risque d'appariements erronés.
-          </p>
-        </div>
-      </section>
-
-      <p class="confidentialite">
-        Vos fichiers sont lus dans ce navigateur et ne sont envoyés nulle part.
-      </p>
-     </div>
-    </aside>
-
-    <main class="contenu">
-      <!-- Page « Rapprochement » -->
-      <section id="page-rapprochement" aria-labelledby="titre-rapprochement">
-        <h1 id="titre-rapprochement">Assistant de rapprochement bancaire</h1>
-        <p>
-          Importez votre relevé bancaire au format PDF et votre grand livre comptable en Excel
-          pour lancer le rapprochement automatique.
+        <p class="prive">
+          <strong>Rien ne quitte votre ordinateur.</strong>
+          Vos fichiers sont lus dans ce navigateur et ne sont envoyés nulle part.
         </p>
+      </div>
+    </div>
+  </header>
 
+  <main>
+    <!-- Page « Rapprochement » -->
+    <div id="page-rapprochement">
+
+      <section class="section cadre" aria-labelledby="titre-fichiers">
+        <div class="section__tete">
+          <h2 id="titre-fichiers">Fichiers</h2>
+          <p>Deux documents de la même période : ce que la banque a enregistré, et ce que la comptabilité a écrit.</p>
+        </div>
         <div class="depots">
+          <!-- La zone de dépôt est un <label> qui contient le vrai champ fichier :
+               un clic n'importe où dans la zone ouvre le sélecteur, et le champ
+               reste atteignable au clavier (Tab, puis Espace ou Entrée). -->
           <div class="depot" data-depot="releve" data-extensions=".pdf" data-format="PDF">
-            <h2>1. Relevé Bancaire</h2>
-            <p class="depot__libelle" id="releve-libelle">Déposez le relevé PDF ici</p>
-            <div class="dropzone">
-              <input type="file" accept=".pdf,application/pdf" class="visuellement-masque"
-                     id="releve-fichier" aria-labelledby="releve-libelle">
-              <p>Glissez le fichier ici, ou</p>
-              <button type="button" class="btn btn--secondary" data-parcourir>Parcourir les fichiers</button>
-              <small>Format accepté : PDF</small>
+            <div class="depot__ligne">
+              <span class="depot__sorte">PDF</span>
+              <span class="puce depot__etat">En attente</span>
             </div>
-            <div class="file-pill" hidden>
-              <span class="file-pill__nom"></span>
-              <span class="file-pill__taille"></span>
-              <button type="button" class="file-pill__retirer" aria-label="Retirer le fichier">×</button>
+            <h3>Relevé bancaire</h3>
+            <label class="depot__zone">
+              <input type="file" accept=".pdf,application/pdf" class="visuellement-masque">
+              <strong>Glissez le relevé ici</strong>
+              <span>ou <u>parcourez vos fichiers</u>. Le PDF tel que la banque le fournit.</span>
+            </label>
+            <div class="fichier" hidden>
+              <div class="fichier__texte">
+                <div class="fichier__nom"></div>
+                <div class="fichier__taille"></div>
+              </div>
+              <button type="button" class="go" data-retirer>Retirer</button>
             </div>
             <p class="depot__erreur" role="alert" hidden></p>
           </div>
 
           <div class="depot" data-depot="grand-livre" data-extensions=".xlsx,.xls" data-format="XLSX, XLS">
-            <h2>2. Grand Livre Comptable</h2>
-            <p class="depot__libelle" id="grand-livre-libelle">Déposez le grand livre Excel ici</p>
-            <div class="dropzone">
-              <input type="file" accept=".xlsx,.xls" class="visuellement-masque"
-                     id="grand-livre-fichier" aria-labelledby="grand-livre-libelle">
-              <p>Glissez le fichier ici, ou</p>
-              <button type="button" class="btn btn--secondary" data-parcourir>Parcourir les fichiers</button>
-              <small>Formats acceptés : XLSX, XLS</small>
+            <div class="depot__ligne">
+              <span class="depot__sorte">Excel</span>
+              <span class="puce depot__etat">En attente</span>
             </div>
-            <div class="file-pill" hidden>
-              <span class="file-pill__nom"></span>
-              <span class="file-pill__taille"></span>
-              <button type="button" class="file-pill__retirer" aria-label="Retirer le fichier">×</button>
+            <h3>Grand livre comptable</h3>
+            <label class="depot__zone">
+              <input type="file" accept=".xlsx,.xls" class="visuellement-masque">
+              <strong>Glissez le grand livre ici</strong>
+              <span>ou <u>parcourez vos fichiers</u>. XLSX ou XLS du compte de banque.</span>
+            </label>
+            <div class="fichier" hidden>
+              <div class="fichier__texte">
+                <div class="fichier__nom"></div>
+                <div class="fichier__taille"></div>
+              </div>
+              <button type="button" class="go" data-retirer>Retirer</button>
             </div>
             <p class="depot__erreur" role="alert" hidden></p>
           </div>
         </div>
-
-        <div class="alert alert--info" id="attente">
-          Veuillez importer les deux fichiers pour activer le bouton de lancement.
-        </div>
-        <button type="button" class="btn btn--primary btn--bloc" id="lancer" hidden>
-          Lancer le rapprochement
-        </button>
-        <div class="progression" id="progression" role="status" hidden>
-          <span class="spinner" aria-hidden="true"></span> Traitement en cours...
-        </div>
-
-        <!-- Résultats, construits par main.js -->
-        <div id="resultats"></div>
       </section>
 
-      <!-- Page « Manuel de procédure » : web/manuel.md, rendu par main.js -->
-      <section id="page-manuel" hidden>
-        <article class="manuel" id="manuel" aria-live="polite"></article>
+      <!-- Bande brume : les deux seuils du match partiel, puis le lancement. -->
+      <div class="bande">
+        <section class="section cadre" aria-labelledby="titre-reglages">
+          <div class="section__tete">
+            <h2 id="titre-reglages">Réglages</h2>
+            <p>Les opérations de même montant et de même date sont toujours rapprochées. Ces deux seuils ne jouent que sur le reste.</p>
+          </div>
+          <div class="reglages">
+            <div class="curseur">
+              <div class="curseur__tete">
+                <label for="tolerance">Tolérance sur la date</label>
+                <output for="tolerance" id="tolerance-valeur"></output>
+              </div>
+              <input type="range" id="tolerance" min="0" max="15" step="1" value="4"
+                     aria-describedby="tolerance-aide">
+              <div class="curseur__bornes" aria-hidden="true"><span>0</span><span>15 jours</span></div>
+              <p id="tolerance-aide">Écart maximal entre la date bancaire et la date comptable.</p>
+            </div>
+            <div class="curseur">
+              <div class="curseur__tete">
+                <label for="score">Similarité des libellés</label>
+                <output for="score" id="score-valeur"></output>
+              </div>
+              <input type="range" id="score" min="50" max="100" step="1" value="80"
+                     aria-describedby="score-aide">
+              <div class="curseur__bornes" aria-hidden="true"><span>50</span><span>100 %</span></div>
+              <p id="score-aide">Plus bas, l'outil rapproche davantage, au risque d'appariements erronés.</p>
+            </div>
+            <div class="lancement">
+              <p class="lancement__etat" id="lancement-etat" role="status"></p>
+              <button type="button" class="btn btn--lancer" id="lancer" aria-describedby="lancement-aide" disabled>
+                Lancer le rapprochement
+              </button>
+              <small id="lancement-aide"></small>
+              <div class="progression" id="progression" role="status" hidden>
+                <span class="sablier" aria-hidden="true"></span> Traitement en cours...
+              </div>
+            </div>
+          </div>
+        </section>
+      </div>
+
+      <!-- Résultat : visible seulement après un calcul. Les messages (contrôle
+           d'extraction, erreurs) sont construits par main.js dans #messages. -->
+      <section class="section cadre" id="resultat" aria-labelledby="titre-resultat" hidden>
+        <div class="section__tete">
+          <h2 id="titre-resultat">Résultat</h2>
+          <button type="button" class="btn btn--marine" id="telecharger" hidden>Télécharger le classeur Excel</button>
+        </div>
+
+        <div class="messages" id="messages"></div>
+
+        <div id="detail" hidden>
+          <div class="synthese">
+            <div class="bloc">
+              <span class="bloc__titre">Taux de rapprochement</span>
+              <p class="taux" id="taux"></p>
+              <div class="repartition" id="repartition" role="img"></div>
+              <div class="legende" id="legende"></div>
+            </div>
+            <div class="bloc">
+              <span class="bloc__titre">À saisir en comptabilité</span>
+              <p class="bloc__nombre" id="nombre-compta"></p>
+              <p>Opérations du relevé absentes du grand livre. <span id="solde-compta"></span></p>
+              <button type="button" class="go" data-aller="compta">Voir ces opérations</button>
+            </div>
+            <div class="bloc">
+              <span class="bloc__titre">En attente à la banque</span>
+              <p class="bloc__nombre" id="nombre-banque"></p>
+              <p>Écritures du grand livre absentes du relevé. <span id="solde-banque"></span></p>
+              <button type="button" class="go" data-aller="banque">Voir ces écritures</button>
+            </div>
+          </div>
+
+          <div class="onglets" id="onglets" role="tablist" aria-label="Détail du résultat">
+            <button type="button" role="tab" id="onglet-rapprochees" data-onglet="rapprochees"
+                    aria-controls="panneau">Rapprochées <b></b></button>
+            <button type="button" role="tab" id="onglet-compta" data-onglet="compta"
+                    aria-controls="panneau">À saisir en comptabilité <b></b></button>
+            <button type="button" role="tab" id="onglet-banque" data-onglet="banque"
+                    aria-controls="panneau">En attente à la banque <b></b></button>
+          </div>
+          <div id="panneau" role="tabpanel" aria-labelledby="onglet-rapprochees">
+            <div class="outils">
+              <input type="search" id="filtre" placeholder="Filtrer par libellé ou montant"
+                     aria-label="Filtrer par libellé ou montant">
+              <div class="puces" id="puces" role="group" aria-label="Type de rapprochement"></div>
+              <span class="outils__compte" id="compte-lignes" aria-live="polite"></span>
+            </div>
+            <div class="table-wrap" id="tableau" tabindex="0" aria-label="Lignes de l'onglet"></div>
+          </div>
+        </div>
       </section>
-    </main>
-  </div>
+    </div>
+
+    <!-- Page « Manuel de procédure » : web/manuel.md, rendu par main.js -->
+    <section class="section cadre" id="page-manuel" hidden>
+      <article class="manuel" id="manuel" aria-live="polite"></article>
+    </section>
+  </main>
+
+  <footer class="pied">
+    <div class="cadre">
+      <span>Rapprochement Facile, outil open source de <a href="https://charleszogoue.ci" rel="noopener">charleszogoue.ci</a></span>
+      <span>© 2026 Charles Zogoue</span>
+    </div>
+  </footer>
 </body>
 </html>
