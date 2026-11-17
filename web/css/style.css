@@ -218,14 +218,15 @@ body[data-page="manuel"] .bandeau h1 { font-size: clamp(2.4rem, 6vw, 4rem); marg
 
 /* ── Résultat : contrôle d'extraction ────────────────────────────────── */
 .verif { border-top: 1px solid var(--rule); border-bottom: 1px solid var(--rule); }
+/* Grille : coche, phrase, lien (le lien passe sous la phrase sur écran étroit). */
 .verif > summary {
-  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 6px 12px;
   padding: 14px 0; cursor: pointer; list-style: none; font-weight: 600;
 }
 .verif > summary::-webkit-details-marker { display: none; }
 .verif > summary svg { color: var(--ok); flex: none; }
 .verif > summary strong { font-weight: 800; }
-.verif > summary .go { margin-left: auto; font-size: .95rem; }
+.verif > summary .go { justify-self: end; font-size: .95rem; white-space: nowrap; }
 .verif__corps { padding-bottom: 20px; }
 
 /* ── Résultat : synthèse ─────────────────────────────────────────────── */
@@ -250,8 +251,8 @@ body[data-page="manuel"] .bandeau h1 { font-size: clamp(2.4rem, 6vw, 4rem); marg
 .t-reste { background: var(--rule); }
 .bloc__nombre { font-family: var(--display); font-weight: 800; font-size: 3.4rem; line-height: 1; letter-spacing: -0.03em; margin: 10px 0 6px; }
 .bloc__nombre span { font-family: var(--body); font-size: 1rem; font-weight: 600; letter-spacing: 0; color: var(--muted); margin-left: 8px; }
-.bloc p { color: var(--muted); font-weight: 600; max-width: 34ch; }
-.bloc p b { color: var(--ink); font-weight: 800; white-space: nowrap; }
+.bloc__texte { color: var(--muted); font-weight: 600; max-width: 34ch; }
+.bloc__texte b { color: var(--ink); font-weight: 800; white-space: nowrap; }
 .bloc .go { margin-top: 16px; }
 
 /* ── Résultat : onglets et barre d'outils ────────────────────────────── */
@@ -298,7 +299,7 @@ td.positif { color: var(--ok); }
    un écran de 1 366 px) ; les deux libellés se partagent la place restante. */
 table.rapprochees { width: 100%; min-width: 0; }
 table.rapprochees th, table.rapprochees td { padding-left: 9px; padding-right: 9px; }
-table.rapprochees td.texte { min-width: 9rem; max-width: none; }
+table.rapprochees td.texte { width: 30%; min-width: 9rem; max-width: none; }
 table.rapprochees thead tr.groupes th { color: var(--sky); border-bottom: 0; padding-bottom: 0; }
 table.rapprochees thead tr.groupes + tr th { top: 34px; padding-top: 2px; }
 table.data .filet { border-left: 1px solid var(--rule); }
@@ -351,9 +352,12 @@ table.data .filet { border-left: 1px solid var(--rule); }
   .onglets { flex-wrap: wrap; overflow-x: visible; border-bottom-width: 0; gap: 6px; }
   .onglets [role="tab"] { border-radius: 8px; border: 1px solid var(--rule); }
   .outils__compte { margin-left: 0; }
+  .verif > summary { grid-template-columns: auto minmax(0, 1fr); align-items: start; }
+  .verif > summary svg { margin-top: 3px; }
+  .verif > summary .go { grid-column: 2; justify-self: start; }
   /* Sur petit écran, le tableau des rapprochées défile dans son cadre. */
   table.rapprochees { width: max-content; min-width: 100%; }
-  table.rapprochees td.texte { min-width: 11rem; max-width: 16rem; }
+  table.rapprochees td.texte { width: auto; min-width: 11rem; max-width: 16rem; }
   .fichier { padding: 16px 18px; }
   .pied { margin-top: 72px; }
 }
